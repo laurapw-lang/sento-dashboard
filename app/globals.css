@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: #f6f8fb;
+  color: #1a2130;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(124, 92, 255, 0.18);
+  color: #1a2130;
+}
+
+/* Foco accesible */
+*:focus-visible {
+  outline: 2px solid #3fa9ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbars claros y discretos */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d5dbe6;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c2cad9;
+  background-clip: padding-box;
+}
+
+@layer utilities {
+  /* Texto con degradado espectro (para acentos puntuales) */
+  .text-spectrum {
+    background: linear-gradient(90deg, #7c5cff, #3fa9ff 50%, #2bd98c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
