@@ -5,7 +5,7 @@
 // (v_deliverability) no tienen grano de fecha → el Periodo no las afecta (nota en la UI).
 
 import { fetchView } from "./db";
-import { inPeriodo, matchVertical, matchCarril, type Filters } from "./filters";
+import { inPeriodo, matchVertical, matchCarril, matchCanal, type Filters } from "./filters";
 import { isReunionesTeam } from "./team";
 
 export type Row = Record<string, any>;
@@ -48,7 +48,8 @@ export function buildProspeccion(raw: ProspeccionRaw, filters: Filters): Prospec
   const rows = raw.prospeccion
     .filter((r) => inPeriodo(r.fecha, filters.periodo))
     .filter((r) => matchVertical(r.vertical, filters))
-    .filter((r) => matchCarril(r.carril, filters));
+    .filter((r) => matchCarril(r.carril, filters))
+    .filter((r) => matchCanal(r.canal, filters)); // Canal solo aplica en Prospección
   const sumFor = (canal: string, key: string) =>
     rows.filter((r) => r.canal === canal).reduce((s, r) => s + num(r[key]), 0);
   const canalesConDatos = CANALES.filter((c) => sumFor(c, "contactados") > 0);

@@ -52,8 +52,12 @@ export default function ProspeccionPage() {
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <CanalFunnel titulo="LinkedIn (HeyReach)" color="#3FA9FF" rows={etapasDe(data.funnelCanal, "LinkedIn")} />
-                  <CanalFunnel titulo="Email (Smartlead)" color="#7C5CFF" rows={etapasDe(data.funnelCanal, "Email")} />
+                  {etapasDe(data.funnelCanal, "LinkedIn").length > 0 && (
+                    <CanalFunnel titulo="LinkedIn (HeyReach)" color="#3FA9FF" rows={etapasDe(data.funnelCanal, "LinkedIn")} />
+                  )}
+                  {etapasDe(data.funnelCanal, "Email").length > 0 && (
+                    <CanalFunnel titulo="Email (Smartlead)" color="#7C5CFF" rows={etapasDe(data.funnelCanal, "Email")} />
+                  )}
                 </div>
               )}
             </section>

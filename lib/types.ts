@@ -46,6 +46,7 @@ export type DealRow = {
   fecha_reunion: string | null;
   fecha_firma: string | null; // cierre real (ganados)
   fecha_cierre_est: string | null; // cierre estimado (abiertos)
+  agendado_por_option_id: string | null; // quién trajo el lead (option_id ESTABLE) — filtro Origen
 };
 
 // Filas de las vistas de gráficas de Venta

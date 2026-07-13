@@ -17,7 +17,8 @@ export type Filters = {
   vertical: string; // "Todas" = sin filtro
   ae: string; // "Todos"
   carril: string; // "Todos"
-  origen: string; // "Todos"
+  origen: string; // "Todos" — persona (setter), aplica a Reuniones/Venta
+  canal: string; // "Todos" — LinkedIn/Email, aplica a Prospección
 };
 
 export const DEFAULT_FILTERS: Filters = {
@@ -26,6 +27,7 @@ export const DEFAULT_FILTERS: Filters = {
   ae: "Todos",
   carril: "Todos",
   origen: "Todos",
+  canal: "Todos",
 };
 
 // Resuelve un preset (o rango personalizado) a { from, to } en 'YYYY-MM-DD', o nulls = "todo".
@@ -83,6 +85,11 @@ export function matchAE(aeName: string | null | undefined, filters: Filters): bo
   return filters.ae === "Todos" || aeName === filters.ae;
 }
 
+// ¿La fila pasa el filtro Canal? "Todos" = sin filtro. Solo aplica a Prospección (fact_prospeccion.canal).
+export function matchCanal(c: string | null | undefined, filters: Filters): boolean {
+  return filters.canal === "Todos" || c === filters.canal;
+}
+
 // Etiqueta legible del periodo activo (para el indicador de filtros).
 export function periodoLabel(p: Periodo): string {
   const map: Record<string, string> = {
@@ -123,6 +130,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     if (filters.ae !== "Todos") n++;
     if (filters.carril !== "Todos") n++;
     if (filters.origen !== "Todos") n++;
+    if (filters.canal !== "Todos") n++;
     return n;
   }, [filters]);
 

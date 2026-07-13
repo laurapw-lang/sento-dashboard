@@ -7,6 +7,7 @@
 
 import { usePathname } from "next/navigation";
 import { useFilters, periodoLabel, type Periodo } from "@/lib/filters";
+import { ORIGEN_OPTIONS } from "@/lib/team";
 
 const PERIODO_OPTS: { value: Periodo["preset"]; label: string }[] = [
   { value: "todo", label: "Todo" },
@@ -17,11 +18,12 @@ const PERIODO_OPTS: { value: Periodo["preset"]; label: string }[] = [
   { value: "personalizado", label: "Personalizado…" },
 ];
 
-const SIMPLE: { key: "vertical" | "ae" | "carril" | "origen"; label: string; options: string[] }[] = [
+const SIMPLE: { key: "vertical" | "ae" | "carril" | "origen" | "canal"; label: string; options: string[] }[] = [
   { key: "vertical", label: "Vertical", options: ["Todas", "Banca/Fintech", "Retail", "Salud", "Seguros", "BPO", "Sin definir"] },
   { key: "ae", label: "AE", options: ["Todos", "Andrés Sanjuán", "Edgardo Velasquez", "Michelle Sosa"] },
   { key: "carril", label: "Carril", options: ["Todos", "Mid-market", "Enterprise"] },
-  { key: "origen", label: "Origen", options: ["Todos", "Andrés Sanjuán", "Laura Peña", "Zalesmachine", "Edgardo Velasquez", "Michelle Sosa"] },
+  { key: "origen", label: "Origen", options: ORIGEN_OPTIONS }, // personas (setter) — Reuniones/Venta
+  { key: "canal", label: "Canal", options: ["Todos", "LinkedIn", "Email"] }, // Prospección
 ];
 
 function Selector({ label, value, options, onChange, active, disabled }: {
@@ -54,8 +56,10 @@ export function Topbar({ title }: { title: string }) {
   const pathname = usePathname();
   const p = filters.periodo;
   const periodoActive = p.preset !== "todo";
-  // AE no aplica en Prospección (datos agregados por campaña, sin dimensión AE) → deshabilitado.
-  const noAplica = (key: string) => key === "ae" && pathname === "/prospeccion";
+  // Deshabilitar por sección: en Prospección no aplican AE ni Origen (personas); Canal solo
+  // aplica en Prospección (en Reuniones/Venta se deshabilita).
+  const noAplica = (key: string) =>
+    pathname === "/prospeccion" ? key === "ae" || key === "origen" : key === "canal";
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-canvas/80 px-6 py-3 backdrop-blur-md">

@@ -54,3 +54,21 @@ export function reunionesLabel(optionId: string | null | undefined, fallback?: s
   if (optionId != null && REU_NAME.has(String(optionId))) return REU_NAME.get(String(optionId))!;
   return fallback || "—";
 }
+
+// --- ORIGEN (quién trajo el lead / setter): nombre -> option_id ESTABLE. Incluye "Otro" (260). ---
+const ORIGEN_ID_BY_NAME: Record<string, string> = {
+  "Andrés Sanjuán": "249",
+  "Laura Peña": "274",
+  "Zalesmachine": "275",
+  "Edgardo Velasquez": "278",
+  "Michelle Sosa": "279",
+  "Otro": "260",
+};
+/** Opciones del filtro Origen (para el Topbar): "Todos" + los setters. */
+export const ORIGEN_OPTIONS = ["Todos", ...Object.keys(ORIGEN_ID_BY_NAME)];
+/** ¿La fila pasa el filtro Origen? Compara agendado_por_option_id contra el id del setter elegido. */
+export function matchOrigen(rowOptionId: string | null | undefined, selectedName: string): boolean {
+  if (!selectedName || selectedName === "Todos") return true;
+  const id = ORIGEN_ID_BY_NAME[selectedName];
+  return id != null && String(rowOptionId ?? "") === id;
+}
