@@ -71,13 +71,13 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
 
   const kpis: Kpi[] = [
     {
-      id: "calif_agendadas",
-      label: "Reuniones calificadas agendadas vs meta",
-      value: calificadas.length,
+      id: "calif_realizadas",
+      label: "Reuniones calificadas realizadas vs meta",
+      value: califRealizadas.length,
       meta: metaTotal || null,
       unit: "int",
       hint: "Métrica principal · cumulativo vs plan jul–dic (filtro por mes se cablea después)",
-      drill: reunionesDrill("Reuniones calificadas agendadas", calificadas),
+      drill: reunionesDrill("Calificadas realizadas", califRealizadas),
     },
     {
       id: "agendadas",
@@ -94,11 +94,12 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
       drill: reunionesDrill("Reuniones realizadas", realizadas),
     },
     {
-      id: "calif_realizadas",
-      label: "Calificadas realizadas",
-      value: califRealizadas.length,
+      id: "calif_agendadas",
+      label: "Calificadas agendadas",
+      value: calificadas.length,
       unit: "int",
-      drill: reunionesDrill("Calificadas realizadas", califRealizadas),
+      hint: "Agendadas que cumplen la regla de calificación",
+      drill: reunionesDrill("Calificadas agendadas", calificadas),
     },
     { id: "show_rate", label: "Show rate", value: showRate, unit: "pct", hint: "Realizadas / Agendadas" },
     {
@@ -112,22 +113,24 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
   ];
 
   // ---- por persona (por option_id ESTABLE del equipo de reuniones) ----
-  // "real" = AGENDADAS (es_agendada), consistente con el KPI "Agendadas totales".
-  // (No se usa es_calificada porque hoy no hay datos de calificación → saldría 0.)
+  // 3 barras por persona: agendadas (actividad), calificadas realizadas (métrica principal
+  // de pagos, es_calificada_realizada) y meta del plan.
   const porPersona: ChartSpec | null = REUNIONES_TEAM.length
     ? {
         id: "reu_persona",
-        title: "Reuniones agendadas — por persona (vs meta del plan)",
+        title: "Por persona — calificadas realizadas vs meta (agendadas de referencia)",
         type: "bar",
         xKey: "persona",
         series: [
-          { key: "real", label: "Agendadas", color: C.cyan },
-          { key: "meta", label: "Meta", color: C.indigo },
+          { key: "agendadas", label: "Agendadas", color: "#3FA9FF" },
+          { key: "realizadas", label: "Calif. realizadas", color: "#1D9E75" },
+          { key: "meta", label: "Meta", color: "#7C5CFF" },
         ],
-        drill: reunionesDrill("Reuniones agendadas", agendadas),
+        drill: reunionesDrill("Calificadas realizadas", califRealizadas),
         data: REUNIONES_TEAM.map((m) => ({
           persona: m.nombre,
-          real: agendadas.filter((r) => String(r.agendado_por_option_id) === m.optionId).length,
+          agendadas: agendadas.filter((r) => String(r.agendado_por_option_id) === m.optionId).length,
+          realizadas: califRealizadas.filter((r) => String(r.agendado_por_option_id) === m.optionId).length,
           meta: m.metaEntidad
             ? metasReu.filter((x) => x.entidad === m.metaEntidad).reduce((s, x) => s + (x.meta_valor ?? 0), 0)
             : 0,
@@ -143,16 +146,16 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
   const mensual: ChartSpec | null = periodos.length
     ? {
         id: "reu_mensual",
-        title: "Vista mensual — agendadas (real vs meta del equipo)",
+        title: "Vista mensual — calificadas realizadas (real vs meta del equipo)",
         type: "line",
         xKey: "mes",
         series: [
-          { key: "real", label: "Agendadas", color: C.fuchsia },
+          { key: "real", label: "Calif. realizadas", color: C.fuchsia },
           { key: "meta", label: "Meta equipo", color: C.violet },
         ],
         data: periodos.map((p) => ({
           mes: monthLabel(p),
-          real: agendadas.filter((r) => r.mes_reunion === p).length,
+          real: califRealizadas.filter((r) => r.mes_reunion === p).length,
           meta: metasReu.filter((m) => m.periodo === p).reduce((s, m) => s + (m.meta_valor ?? 0), 0),
         })),
       }

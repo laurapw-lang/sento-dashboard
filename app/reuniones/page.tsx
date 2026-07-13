@@ -19,7 +19,7 @@ export default function ReunionesPage() {
         <div className="flex items-center gap-2">
           <Pill tone="ok">sección central</Pill>
           <span className="text-xs text-ink-muted">
-            La métrica principal es <strong className="text-ink">reuniones calificadas agendadas vs meta</strong>.
+            La métrica principal es <strong className="text-ink">reuniones calificadas realizadas vs meta</strong> (la reunión ocurrió Y calificó).
           </span>
         </div>
 
@@ -33,9 +33,16 @@ export default function ReunionesPage() {
             )}
 
             <section>
-              <SectionTitle>Indicadores clave</SectionTitle>
+              <SectionTitle>Métrica principal</SectionTitle>
+              <div className="mt-3">
+                {data.kpis[0] && <KpiCard kpi={data.kpis[0]} />}
+              </div>
+            </section>
+
+            <section>
+              <SectionTitle>Indicadores de apoyo</SectionTitle>
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {data.kpis.map((k) => (
+                {data.kpis.slice(1).map((k) => (
                   <KpiCard key={k.id} kpi={k} />
                 ))}
               </div>
