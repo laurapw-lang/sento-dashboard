@@ -40,6 +40,11 @@ export default function ReunionesPage() {
                 {activeCount > 0 ? "Sin resultados para este filtro" : "v_reuniones sin filas — se muestran metas y ceros"}
               </Pill>
             )}
+            {data.periodoNota && (
+              <p className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                <Pill tone="info">periodo</Pill> {data.periodoNota}
+              </p>
+            )}
 
             <section>
               <SectionTitle>Métrica principal</SectionTitle>

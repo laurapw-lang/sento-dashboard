@@ -6,6 +6,7 @@
 
 import { fetchView } from "./db";
 import { inPeriodo, type Filters } from "./filters";
+import { isReunionesTeam } from "./team";
 
 export type Row = Record<string, any>;
 const num = (v: any) => (v == null ? 0 : Number(v) || 0);
@@ -13,19 +14,19 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((1000 * a) / b) / 10 :
 
 export type ProspeccionRaw = {
   prospeccion: Row[]; // fact_prospeccion CRUDO
-  segmento: Row[]; // v_funnel_prospeccion
+  reuniones: Row[]; // v_reuniones CRUDO (para el segmento, filtrable por periodo)
   deliverability: Row[]; // v_deliverability
   delResumen: Row[]; // v_deliverability_resumen
 };
 
 export async function fetchProspeccionRaw(): Promise<ProspeccionRaw> {
-  const [prospeccion, segmento, deliverability, delResumen] = await Promise.all([
+  const [prospeccion, reuniones, deliverability, delResumen] = await Promise.all([
     fetchView("fact_prospeccion"),
-    fetchView("v_funnel_prospeccion"),
+    fetchView("v_reuniones"),
     fetchView("v_deliverability"),
     fetchView("v_deliverability_resumen"),
   ]);
-  return { prospeccion, segmento, deliverability, delResumen };
+  return { prospeccion, reuniones, deliverability, delResumen };
 }
 
 export type ProspeccionData = {
@@ -110,10 +111,41 @@ export function buildProspeccion(raw: ProspeccionRaw, filters: Filters): Prospec
   }
   const ab: Row[] = Array.from(abMap.values()).map((r) => ({ ...r, interes_pct: pct(r.interesados, r.contactados) }));
 
+  // --- Segmento → reunión (vertical × carril): prospección (filtrada) + reuniones del
+  // equipo (filtradas por periodo). Reconstruido desde crudo para respetar el filtro y
+  // cuadrar con la sección Reuniones (mismo team + fecha_reunion). Atribución aproximada.
+  type Seg = { contactados: number; interesados: number; agendadas: number; calificadas: number; realizadas: number; no_shows: number };
+  const segMap = new Map<string, Seg>();
+  const seg = (k: string): Seg =>
+    segMap.get(k) ?? { contactados: 0, interesados: 0, agendadas: 0, calificadas: 0, realizadas: 0, no_shows: 0 };
+  for (const r of rows) {
+    const k = `${r.vertical}||${r.carril}`;
+    const s = seg(k);
+    s.contactados += num(r.contactados);
+    s.interesados += num(r.respuestas_pos);
+    segMap.set(k, s);
+  }
+  const reunTeam = raw.reuniones
+    .filter((r) => isReunionesTeam(r.agendado_por_option_id))
+    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+  for (const r of reunTeam) {
+    const k = `${r.vertical}||${r.carril}`;
+    const s = seg(k);
+    if (r.es_agendada) s.agendadas++;
+    if (r.es_calificada) s.calificadas++;
+    if (r.es_realizada) s.realizadas++;
+    if (r.es_agendada && !r.es_realizada) s.no_shows++;
+    segMap.set(k, s);
+  }
+  const segmento: Row[] = Array.from(segMap.entries()).map(([k, s]) => {
+    const [vertical, carril] = k.split("||");
+    return { vertical, carril, ...s };
+  });
+
   return {
     funnelCanal,
     canal,
-    segmento: raw.segmento,
+    segmento,
     deliverability: raw.deliverability,
     deliverabilityResumen: raw.delResumen.length ? raw.delResumen[0] : null,
     ab,

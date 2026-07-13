@@ -18,7 +18,13 @@ import { useMemo } from "react";
 
 export default function VentaPage() {
   const { open } = useDrilldown();
-  const { filters } = useFilters();
+  const { filters, activeCount } = useFilters();
+  const periodoActivo = filters.periodo.preset !== "todo";
+  // Nota interpretativa: hoy los deals no tienen fecha de cierre en el CRM, así que el
+  // filtro de Periodo (por fecha de cierre) los excluye a todos.
+  const ventaVaciaPorFecha = periodoActivo
+    ? "Sin deals con fecha de cierre en el periodo. Los deals aún no tienen fecha de cierre capturada en Pipedrive, así que el filtro de Periodo los excluye — quítalo para ver el pipeline."
+    : "Sin deals de Operación México en fact_deals todavía";
   const { loading, error, data: rawData } = useAsync(fetchVentaRaw);
   const gRaw = useAsync(fetchVentaGraficasRaw);
   const data = useMemo(
@@ -44,7 +50,7 @@ export default function VentaPage() {
           {g.loading && <div className="mt-3"><LoadingBlock label="Cargando embudo desde Supabase…" /></div>}
           {g.error && <div className="mt-3"><ErrorBlock message={g.error} /></div>}
           {!g.loading && !g.error && g.data && (g.data.isEmpty ? (
-            <div className="mt-3"><EmptyBlock label="Sin deals del equipo AE todavía" /></div>
+            <div className="mt-3"><EmptyBlock label={activeCount > 0 ? ventaVaciaPorFecha : "Sin deals del equipo AE todavía"} /></div>
           ) : (
             <div className="mt-3 space-y-4">
               <FunnelJourney stages={g.data.funnel} />
@@ -62,9 +68,7 @@ export default function VentaPage() {
 
         {loading && <LoadingBlock label="Cargando indicadores…" />}
         {error && <ErrorBlock message={error} />}
-        {!loading && !error && data?.isEmpty && (
-          <EmptyBlock label="Sin deals de Operación México en fact_deals todavía" />
-        )}
+        {!loading && !error && data?.isEmpty && <EmptyBlock label={ventaVaciaPorFecha} />}
 
         {!loading && !error && data && !data.isEmpty && (
           <>

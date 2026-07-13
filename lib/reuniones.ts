@@ -53,15 +53,23 @@ export type ReunionesData = {
   porCanal: ChartSpec | null; // null = sin campo canal todavía
   mensual: ChartSpec | null;
   calificacionPendiente: boolean; // true = calificación sin confirmar (graban_llamadas vacío en CRM)
+  periodoNota: string | null; // aviso si el periodo excluye reuniones sin fecha
 };
 
 export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filters: Filters): ReunionesData {
   // Filtro de equipo por IDENTIFICADOR ESTABLE: solo reuniones traídas por el equipo
   // (agendado_por_option_id ∈ REUNIONES_TEAM). Fuera del equipo → EXCLUIDO, sin romper.
   // + Filtro de PERIODO (global) por fecha_reunion. Se SUMA al filtro de equipo base.
-  const teamReuniones = reuniones
-    .filter((r) => isReunionesTeam(r.agendado_por_option_id))
-    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+  const teamAll = reuniones.filter((r) => isReunionesTeam(r.agendado_por_option_id));
+  const teamReuniones = teamAll.filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+
+  // Nota interpretativa: cuántas agendadas del equipo quedan fuera por no tener fecha_reunion.
+  const periodoActivo = filters.periodo.preset !== "todo";
+  const sinFecha = teamAll.filter((r) => r.es_agendada && !r.fecha_reunion).length;
+  const periodoNota =
+    periodoActivo && sinFecha > 0
+      ? `Periodo activo: ${sinFecha} reunión(es) agendada(s) sin fecha registrada quedan fuera del conteo.`
+      : null;
 
   const agendadas = teamReuniones.filter((r) => r.es_agendada);
   const realizadas = teamReuniones.filter((r) => r.es_realizada);
@@ -188,6 +196,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     porCanal,
     mensual,
     calificacionPendiente,
+    periodoNota,
   };
 }
 
