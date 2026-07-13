@@ -39,7 +39,7 @@ function dealsDrill(title: string, rows: DealRow[]): DrillPayload {
     subtitle: `${rows.length} deal(s)`,
     columns: [
       { key: "deal_id", label: "Deal" },
-      { key: "cuenta", label: "Cuenta" },
+      { key: "cuenta", label: "Cuenta", type: "dealLink" },
       { key: "etapa", label: "Etapa actual" },
       { key: "max_stage", label: "Etapa máx." },
       { key: "mrr", label: "MRR", align: "right" },

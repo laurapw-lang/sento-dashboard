@@ -49,7 +49,7 @@ function dealsDrill(title: string, rows: DealRow[]): DrillPayload {
     subtitle: `${rows.length} deal(s)`,
     columns: [
       { key: "deal_id", label: "Deal" },
-      { key: "cuenta", label: "Cuenta" },
+      { key: "cuenta", label: "Cuenta", type: "dealLink" },
       { key: "etapa", label: "Etapa" },
       { key: "vertical", label: "Vertical" },
       { key: "carril", label: "Carril" },
@@ -201,13 +201,14 @@ export function buildVenta(
   const dealsAtencion: DrillPayload = {
     title: "Deals que requieren atención (estancados)",
     columns: [
-      { key: "cuenta", label: "Cuenta" },
+      { key: "cuenta", label: "Cuenta", type: "dealLink" },
       { key: "etapa", label: "Etapa" },
       { key: "dias", label: "Días en etapa", align: "right" },
       { key: "ae", label: "AE" },
       { key: "siguiente", label: "Siguiente paso" },
     ],
     rows: atencion.map((d) => ({
+      deal_id: d.deal_id,
       cuenta: d.cuenta,
       etapa: d.etapa,
       dias: n(d.dias_en_etapa),

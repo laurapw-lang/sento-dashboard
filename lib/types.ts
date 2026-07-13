@@ -1,6 +1,6 @@
 // Tipos compartidos del dashboard (mock por ahora; el shape refleja el modelo real).
 
-export type Column = { key: string; label: string; align?: "left" | "right" };
+export type Column = { key: string; label: string; align?: "left" | "right"; type?: "dealLink" };
 
 export type DrillPayload = {
   title: string;

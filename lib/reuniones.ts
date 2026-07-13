@@ -28,7 +28,7 @@ function reunionesDrill(title: string, rows: ReunionRow[]): DrillPayload {
     title,
     subtitle: `${rows.length} reunión(es)`,
     columns: [
-      { key: "cuenta", label: "Cuenta" },
+      { key: "cuenta", label: "Cuenta", type: "dealLink" },
       { key: "mes", label: "Mes" },
       { key: "agendado_por", label: "Agendó (proxy)" },
       { key: "ae", label: "AE" },
@@ -36,6 +36,7 @@ function reunionesDrill(title: string, rows: ReunionRow[]): DrillPayload {
       { key: "etapa", label: "Etapa" },
     ],
     rows: rows.map((r) => ({
+      deal_id: r.deal_id,
       cuenta: r.cuenta,
       mes: r.mes_reunion ? r.mes_reunion.slice(0, 7) : "sin fecha",
       agendado_por: reunionesLabel(r.agendado_por_option_id, r.agendado_por),
