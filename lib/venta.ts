@@ -7,8 +7,9 @@ import { fetchDeals, fetchMetas, fetchPipelineObjetivo } from "./db";
 import { isAeVenta, aeLabel, matchOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, type Filters } from "./filters";
 
-// Fecha de cierre del deal para el filtro de PERIODO: firma (ganados) o cierre estimado.
-const cierreDate = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
+// Fecha de cierre del deal para el filtro de PERIODO = won_time (fact_deals.fecha_firma):
+// la fecha en que el deal se GANÓ. Los no ganados no tienen -> quedan fuera del filtro (correcto).
+const cierreDate = (d: DealRow) => d.fecha_firma;
 
 // Paleta espectro Sento para series de gráficas (no-semáforo).
 const C = {

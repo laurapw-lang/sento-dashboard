@@ -7,7 +7,7 @@ import { fetchFunnelJourney, fetchPipelineActual, fetchPerdidasMotivo, fetchDeal
 import { isAeVenta, aeLabel, matchOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, type Filters } from "./filters";
 
-const cierre = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
+const cierre = (d: DealRow) => d.fecha_firma; // won_time (fecha de Ganado)
 
 // rank del stage_id (mismo orden del embudo). 'Ganado' es status -> rank 9.
 const STAGE_RANK: Record<number, number> = { 20: 1, 21: 2, 22: 3, 23: 4, 24: 5, 29: 6, 28: 7, 27: 8 };

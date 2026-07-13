@@ -20,13 +20,13 @@ export default function VentaPage() {
   const { open } = useDrilldown();
   const { filters, activeCount } = useFilters();
   const periodoActivo = filters.periodo.preset !== "todo";
-  // Mensaje de vacío según la causa: sin filtros, por Periodo (fechas de cierre en null hoy),
-  // o por otro filtro (ej. Vertical sin deals).
+  // Mensaje de vacío según la causa. La fecha de cierre = won_time (fecha de Ganado): los deals
+  // aún no ganados no cuentan para el filtro de Periodo (correcto, todavía no cerraron).
   const ventaVaciaPorFecha =
     activeCount === 0
       ? "Sin deals de Operación México en fact_deals todavía"
       : periodoActivo
-      ? "Sin deals con fecha de cierre en el periodo. Los deals aún no tienen fecha de cierre capturada en Pipedrive, así que el filtro de Periodo los excluye — quítalo para ver el pipeline."
+      ? "No hay deals ganados en este período. La fecha de cierre = won_time (cuándo se ganó el deal); los que aún no se ganan no cuentan — aparecerán al ganarlos. Quita el Periodo para ver todo el pipeline."
       : "Sin resultados para este filtro";
   const { loading, error, data: rawData } = useAsync(fetchVentaRaw);
   const gRaw = useAsync(fetchVentaGraficasRaw);
