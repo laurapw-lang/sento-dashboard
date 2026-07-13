@@ -17,8 +17,8 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
   const hasMeta = typeof kpi.meta === "number" && kpi.meta! > 0;
   const rawPct = hasMeta ? Math.round((kpi.value / (kpi.meta as number)) * 100) : 0;
   const barPct = Math.min(100, rawPct);
-  const sem = hasMeta ? getSemaforo(rawPct) : null;
-  const leftColor = sem ? sem.color : NEUTRAL;
+  const sem = hasMeta && !kpi.pendiente ? getSemaforo(rawPct) : null;
+  const leftColor = kpi.pendiente ? "#EF9F27" : sem ? sem.color : NEUTRAL;
   const clickable = !!kpi.drill;
 
   return (
@@ -41,7 +41,19 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
         {hasMeta && <span className="text-sm text-ink-muted">/ {fmt(kpi.meta as number, kpi.unit)}</span>}
       </div>
 
-      {hasMeta && sem ? (
+      {kpi.pendiente ? (
+        <div className="mt-3">
+          {hasMeta && (
+            <div className="text-[11px] text-ink-muted">
+              meta {fmt(kpi.meta as number, kpi.unit)} · sin confirmar aún
+            </div>
+          )}
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-semaforo-amber/30 bg-semaforo-amber/12 px-2 py-0.5 text-[11px] font-semibold text-[#B9770F]">
+            ⏳ {kpi.pendiente}
+          </span>
+          {kpi.hint && <p className="mt-2 text-[11px] leading-snug text-ink-muted">{kpi.hint}</p>}
+        </div>
+      ) : hasMeta && sem ? (
         <div className="mt-3">
           <div className="h-2 w-full overflow-hidden rounded-full bg-line/70">
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barPct}%`, backgroundColor: sem.color }} />

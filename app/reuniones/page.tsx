@@ -37,6 +37,14 @@ export default function ReunionesPage() {
               <div className="mt-3">
                 {data.kpis[0] && <KpiCard kpi={data.kpis[0]} />}
               </div>
+              {data.calificacionPendiente && (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                  <Pill tone="warn">pendiente CRM</Pill>
+                  Las calificadas se contarán cuando el equipo confirme{" "}
+                  <strong className="text-ink">&quot;graban llamadas&quot;</strong> en Pipedrive (calificación
+                  estricta). El <strong className="text-ink">0</strong> = dato faltante, no bajo desempeño.
+                </p>
+              )}
             </section>
 
             <section>

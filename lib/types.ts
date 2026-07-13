@@ -17,6 +17,7 @@ export type Kpi = {
   unit?: "money" | "int" | "pct";
   tentativo?: boolean;       // meta tentativa -> badge/asterisco
   hint?: string;
+  pendiente?: string;        // dato faltante (ej. CRM sin llenar): muestra badge neutral en vez de semáforo rojo
   drill?: DrillPayload;      // detalle al hacer clic
 };
 

@@ -51,6 +51,7 @@ export type ReunionesData = {
   porPersona: ChartSpec | null;
   porCanal: ChartSpec | null; // null = sin campo canal todavía
   mensual: ChartSpec | null;
+  calificacionPendiente: boolean; // true = calificación sin confirmar (graban_llamadas vacío en CRM)
 };
 
 export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): ReunionesData {
@@ -112,6 +113,17 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
     },
   ];
 
+  // "Pendiente": hay reuniones agendadas pero NINGUNA tiene graban_llamadas confirmado (=true).
+  // Con la regla ESTRICTA, calificadas realizadas = 0 por DATO FALTANTE del CRM, no por desempeño.
+  // Se marca el KPI principal como pendiente para que el semáforo no salga rojo alarmante.
+  const grabanMarcados = teamReuniones.filter((r) => r.graban_llamadas != null).length;
+  const calificacionPendiente = califRealizadas.length === 0 && agendadas.length > 0 && grabanMarcados === 0;
+  if (calificacionPendiente) {
+    kpis[0].pendiente = "Sin confirmar aún (CRM)";
+    kpis[0].hint =
+      "0 hasta que el equipo marque 'graban llamadas' en Pipedrive. No es bajo desempeño: es dato faltante (calificación estricta).";
+  }
+
   // ---- por persona (por option_id ESTABLE del equipo de reuniones) ----
   // 3 barras por persona: agendadas (actividad), calificadas realizadas (métrica principal
   // de pagos, es_calificada_realizada) y meta del plan.
@@ -167,6 +179,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
     porPersona,
     porCanal,
     mensual,
+    calificacionPendiente,
   };
 }
 
