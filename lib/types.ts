@@ -44,6 +44,8 @@ export type DealRow = {
   max_stage_id: number | null; // stage_id de la etapa máxima alcanzada (embudo)
   max_stage: string | null; // nombre de esa etapa
   fecha_reunion: string | null;
+  fecha_firma: string | null; // cierre real (ganados)
+  fecha_cierre_est: string | null; // cierre estimado (abiertos)
 };
 
 // Filas de las vistas de gráficas de Venta

@@ -5,6 +5,7 @@
 import type { Kpi, ChartSpec, DrillPayload, ReunionRow, MetaRow } from "./types";
 import { fetchReuniones, fetchMetas } from "./db";
 import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM } from "./team";
+import { inPeriodo, type Filters } from "./filters";
 
 // Paleta espectro Sento para series (no-semáforo): real vs meta bien diferenciables.
 const C = {
@@ -54,10 +55,13 @@ export type ReunionesData = {
   calificacionPendiente: boolean; // true = calificación sin confirmar (graban_llamadas vacío en CRM)
 };
 
-export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): ReunionesData {
+export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filters: Filters): ReunionesData {
   // Filtro de equipo por IDENTIFICADOR ESTABLE: solo reuniones traídas por el equipo
   // (agendado_por_option_id ∈ REUNIONES_TEAM). Fuera del equipo → EXCLUIDO, sin romper.
-  const teamReuniones = reuniones.filter((r) => isReunionesTeam(r.agendado_por_option_id));
+  // + Filtro de PERIODO (global) por fecha_reunion. Se SUMA al filtro de equipo base.
+  const teamReuniones = reuniones
+    .filter((r) => isReunionesTeam(r.agendado_por_option_id))
+    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
 
   const agendadas = teamReuniones.filter((r) => r.es_agendada);
   const realizadas = teamReuniones.filter((r) => r.es_realizada);
@@ -67,7 +71,11 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
   const showRate = agendadas.length ? realizadas.length / agendadas.length : 0;
   const tasaCalif = agendadas.length ? calificadas.length / agendadas.length : 0;
 
-  const metasReu = metas.filter((m) => m.tipo_meta === "reuniones");
+  // Metas también filtradas por PERIODO (por su 'periodo' mensual) → el headline compara
+  // real vs la meta del rango elegido (no siempre el plan completo).
+  const metasReu = metas
+    .filter((m) => m.tipo_meta === "reuniones")
+    .filter((m) => inPeriodo(m.periodo, filters.periodo));
   const metaTotal = metasReu.reduce((s, m) => s + (m.meta_valor ?? 0), 0);
 
   const kpis: Kpi[] = [
@@ -183,7 +191,8 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[]): Reuni
   };
 }
 
-export async function loadReunionesData(): Promise<ReunionesData> {
+// Fetch CRUDO (una vez). La página construye la vista con useMemo(build(raw, filters)).
+export async function fetchReunionesRaw(): Promise<{ reuniones: ReunionRow[]; metas: MetaRow[] }> {
   const [reuniones, metas] = await Promise.all([fetchReuniones(), fetchMetas()]);
-  return buildReuniones(reuniones, metas);
+  return { reuniones, metas };
 }

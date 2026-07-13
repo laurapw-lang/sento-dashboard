@@ -11,13 +11,28 @@ import { FunnelJourney } from "@/components/venta/FunnelJourney";
 import { PipelineActualChart } from "@/components/venta/PipelineActualChart";
 import { MotivosChart } from "@/components/venta/MotivosChart";
 import { useAsync } from "@/lib/useAsync";
-import { loadVentaData } from "@/lib/venta";
-import { loadVentaGraficas } from "@/lib/ventaGraficas";
+import { useFilters } from "@/lib/filters";
+import { fetchVentaRaw, buildVenta } from "@/lib/venta";
+import { fetchVentaGraficasRaw, buildVentaGraficas } from "@/lib/ventaGraficas";
+import { useMemo } from "react";
 
 export default function VentaPage() {
   const { open } = useDrilldown();
-  const { loading, error, data } = useAsync(loadVentaData);
-  const g = useAsync(loadVentaGraficas);
+  const { filters } = useFilters();
+  const { loading, error, data: rawData } = useAsync(fetchVentaRaw);
+  const gRaw = useAsync(fetchVentaGraficasRaw);
+  const data = useMemo(
+    () => (rawData ? buildVenta(rawData.deals, rawData.metas, rawData.pipe, filters) : null),
+    [rawData, filters]
+  );
+  const g = useMemo(
+    () => ({
+      loading: gRaw.loading,
+      error: gRaw.error,
+      data: gRaw.data ? buildVentaGraficas(gRaw.data, filters) : null,
+    }),
+    [gRaw.loading, gRaw.error, gRaw.data, filters]
+  );
 
   return (
     <>

@@ -20,7 +20,7 @@ export async function fetchDeals(): Promise<DealRow[]> {
   const { data, error } = await sb
     .from("fact_deals")
     .select(
-      "deal_id,cuenta,operacion,etapa,mrr,prob,origen,vertical,carril,ae,owner_id,owner_email,dias_sin_actividad,siguiente_paso,dias_en_etapa,winloss_razon,motivo_perdida_option_id,max_stage_id,max_stage,fecha_reunion"
+      "deal_id,cuenta,operacion,etapa,mrr,prob,origen,vertical,carril,ae,owner_id,owner_email,dias_sin_actividad,siguiente_paso,dias_en_etapa,winloss_razon,motivo_perdida_option_id,max_stage_id,max_stage,fecha_reunion,fecha_firma,fecha_cierre_est"
     )
     .ilike("operacion", MX);
   if (error) throw new Error(`fact_deals: ${error.message}`);

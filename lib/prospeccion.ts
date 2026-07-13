@@ -1,48 +1,124 @@
-// Carga de la sección Prospección. Lee las vistas ya creadas (solo lectura, anon).
-// fact_prospeccion está vacía hasta que el Flujo 4 corra (Fase 1) → las partes de
-// prospección quedan vacías y la UI muestra "sin datos aún". La parte de reuniones
-// (v_funnel_prospeccion) SÍ trae datos reales.
+// Carga de la sección Prospección. Para soportar el filtro de PERIODO (y luego
+// vertical/carril/canal), el funnel/comparativa/A-B se construyen desde la tabla CRUDA
+// fact_prospeccion (que tiene fecha, canal, vertical, carril), no desde las vistas
+// pre-agregadas. El segmento→reunión (v_funnel_prospeccion) y la entregabilidad
+// (v_deliverability) no tienen grano de fecha → el Periodo no las afecta (nota en la UI).
 
 import { fetchView } from "./db";
+import { inPeriodo, type Filters } from "./filters";
 
 export type Row = Record<string, any>;
+const num = (v: any) => (v == null ? 0 : Number(v) || 0);
+const pct = (a: number, b: number) => (b > 0 ? Math.round((1000 * a) / b) / 10 : 0);
 
-export type ProspeccionData = {
-  funnelCanal: Row[];              // v_prospeccion_funnel (tidy: canal, orden, etapa, valor)
-  canal: Row[];                    // v_prospeccion_canal
-  segmento: Row[];                 // v_funnel_prospeccion (vertical×carril + reuniones)
-  deliverability: Row[];           // v_deliverability (por dominio)
-  deliverabilityResumen: Row | null; // v_deliverability_resumen (1 fila)
-  ab: Row[];                       // v_prospeccion_ab
-  // flags de estado por sección
-  prospEmpty: boolean;             // fact_prospeccion vacía → funnel/canal/AB sin datos
-  segmentoTieneReuniones: boolean; // v_funnel_prospeccion trae agendadas/calificadas reales
-  deliverabilityEmpty: boolean;    // fact_deliverability vacía
-  abTieneDatos: boolean;
+export type ProspeccionRaw = {
+  prospeccion: Row[]; // fact_prospeccion CRUDO
+  segmento: Row[]; // v_funnel_prospeccion
+  deliverability: Row[]; // v_deliverability
+  delResumen: Row[]; // v_deliverability_resumen
 };
 
-const num = (v: any) => (v == null ? 0 : Number(v) || 0);
-
-export async function loadProspeccion(): Promise<ProspeccionData> {
-  const [funnelCanal, canal, segmento, deliverability, delResumen, ab] = await Promise.all([
-    fetchView("v_prospeccion_funnel"),
-    fetchView("v_prospeccion_canal"),
+export async function fetchProspeccionRaw(): Promise<ProspeccionRaw> {
+  const [prospeccion, segmento, deliverability, delResumen] = await Promise.all([
+    fetchView("fact_prospeccion"),
     fetchView("v_funnel_prospeccion"),
     fetchView("v_deliverability"),
     fetchView("v_deliverability_resumen"),
-    fetchView("v_prospeccion_ab"),
   ]);
+  return { prospeccion, segmento, deliverability, delResumen };
+}
+
+export type ProspeccionData = {
+  funnelCanal: Row[]; // tidy: canal, orden, etapa, valor
+  canal: Row[]; // por canal + tasas
+  segmento: Row[]; // v_funnel_prospeccion (no filtrada por periodo)
+  deliverability: Row[];
+  deliverabilityResumen: Row | null;
+  ab: Row[];
+  prospEmpty: boolean;
+  deliverabilityEmpty: boolean;
+  abTieneDatos: boolean;
+};
+
+const CANALES = ["LinkedIn", "Email"];
+
+export function buildProspeccion(raw: ProspeccionRaw, filters: Filters): ProspeccionData {
+  // fact_prospeccion filtrado por PERIODO (fecha). (vertical/carril/canal: partes siguientes)
+  const rows = raw.prospeccion.filter((r) => inPeriodo(r.fecha, filters.periodo));
+  const sumFor = (canal: string, key: string) =>
+    rows.filter((r) => r.canal === canal).reduce((s, r) => s + num(r[key]), 0);
+  const canalesConDatos = CANALES.filter((c) => sumFor(c, "contactados") > 0);
+
+  // --- funnel tidy por canal ---
+  const funnelCanal: Row[] = [];
+  for (const c of canalesConDatos) {
+    const contactados = sumFor(c, "contactados");
+    const respuestas = sumFor(c, "respuestas");
+    const interesados = sumFor(c, "respuestas_pos");
+    if (c === "LinkedIn") {
+      funnelCanal.push(
+        { canal: c, orden: 1, etapa: "Enviadas", valor: contactados },
+        { canal: c, orden: 2, etapa: "Aceptadas", valor: sumFor(c, "aceptadas") },
+        { canal: c, orden: 3, etapa: "Respuestas", valor: respuestas },
+        { canal: c, orden: 4, etapa: "Interesados", valor: interesados }
+      );
+    } else {
+      funnelCanal.push(
+        { canal: c, orden: 1, etapa: "Enviados", valor: contactados },
+        { canal: c, orden: 2, etapa: "Aperturas", valor: sumFor(c, "aperturas") },
+        { canal: c, orden: 3, etapa: "Clicks", valor: sumFor(c, "clicks") },
+        { canal: c, orden: 4, etapa: "Respuestas", valor: respuestas },
+        { canal: c, orden: 5, etapa: "Interesados", valor: interesados }
+      );
+    }
+  }
+
+  // --- comparativa por canal ---
+  const canal: Row[] = canalesConDatos.map((c) => {
+    const contactados = sumFor(c, "contactados");
+    const respuestas = sumFor(c, "respuestas");
+    const interesados = sumFor(c, "respuestas_pos");
+    return {
+      canal: c,
+      contactados,
+      aceptadas: sumFor(c, "aceptadas"),
+      aperturas: sumFor(c, "aperturas"),
+      clicks: sumFor(c, "clicks"),
+      respuestas,
+      interesados,
+      resp_pct: pct(respuestas, contactados),
+      interes_pct: pct(interesados, contactados),
+    };
+  });
+
+  // --- A/B por canal × campaña × variante ---
+  const abMap = new Map<string, Row>();
+  for (const r of rows) {
+    const k = `${r.canal}||${r.campana}||${r.variante}`;
+    const cur = abMap.get(k) ?? {
+      canal: r.canal,
+      campana: r.campana,
+      variante: r.variante,
+      contactados: 0,
+      respuestas: 0,
+      interesados: 0,
+    };
+    cur.contactados += num(r.contactados);
+    cur.respuestas += num(r.respuestas);
+    cur.interesados += num(r.respuestas_pos);
+    abMap.set(k, cur);
+  }
+  const ab: Row[] = Array.from(abMap.values()).map((r) => ({ ...r, interes_pct: pct(r.interesados, r.contactados) }));
 
   return {
     funnelCanal,
     canal,
-    segmento,
-    deliverability,
-    deliverabilityResumen: delResumen.length ? delResumen[0] : null,
+    segmento: raw.segmento,
+    deliverability: raw.deliverability,
+    deliverabilityResumen: raw.delResumen.length ? raw.delResumen[0] : null,
     ab,
-    prospEmpty: canal.length === 0 && funnelCanal.length === 0,
-    segmentoTieneReuniones: segmento.some((r) => num(r.agendadas) > 0 || num(r.calificadas) > 0),
-    deliverabilityEmpty: deliverability.length === 0,
+    prospEmpty: rows.length === 0,
+    deliverabilityEmpty: raw.deliverability.length === 0,
     abTieneDatos: ab.some((r) => num(r.contactados) > 0),
   };
 }

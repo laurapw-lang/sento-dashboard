@@ -2,9 +2,12 @@
 // a partir de las vistas (v_funnel_journey, v_pipeline_actual, v_perdidas_motivo) y de
 // fact_deals (para el drill-down a nivel deal). Filtro de equipo AE por owner_id.
 
-import type { DealRow, DrillPayload } from "./types";
+import type { DealRow, DrillPayload, FunnelRow, PipelineActualRow, MotivoRow } from "./types";
 import { fetchFunnelJourney, fetchPipelineActual, fetchPerdidasMotivo, fetchDeals } from "./db";
 import { isAeVenta, aeLabel } from "./team";
+import { inPeriodo, type Filters } from "./filters";
+
+const cierre = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
 
 // rank del stage_id (mismo orden del embudo). 'Ganado' es status -> rank 9.
 const STAGE_RANK: Record<number, number> = { 20: 1, 21: 2, 22: 3, 23: 4, 24: 5, 29: 6, 28: 7, 27: 8 };
@@ -58,40 +61,64 @@ export type PipelineBar = { etapa: string; deals: number; mrr: number; cat: "act
 export type MotivoBar = { motivo: string; deals: number; drill: DrillPayload };
 export type VentaGraficas = { isEmpty: boolean; funnel: FunnelStage[]; pipeline: PipelineBar[]; motivos: MotivoBar[] };
 
-export async function loadVentaGraficas(): Promise<VentaGraficas> {
+// Fetch CRUDO (una vez). Las vistas se usan solo para la ESTRUCTURA (orden de etapas,
+// lista de motivos); los CONTEOS se recalculan desde los deals filtrados.
+export async function fetchVentaGraficasRaw(): Promise<{
+  funnelRows: FunnelRow[];
+  pipeRows: PipelineActualRow[];
+  motivoRows: MotivoRow[];
+  deals: DealRow[];
+}> {
   const [funnelRows, pipeRows, motivoRows, deals] = await Promise.all([
     fetchFunnelJourney(),
     fetchPipelineActual(),
     fetchPerdidasMotivo(),
     fetchDeals(),
   ]);
-  const team = deals.filter((d) => isAeVenta(d.owner_id));
+  return { funnelRows, pipeRows, motivoRows, deals };
+}
 
-  const funnel: FunnelStage[] = funnelRows.map((r, i) => {
-    const prev = i > 0 ? funnelRows[i - 1].alcanzaron : null;
-    const conv = i === 0 ? 1 : prev && prev > 0 ? r.alcanzaron / prev : null;
-    return {
-      rank: r.rank_etapa,
-      etapa: r.etapa,
-      alcanzaron: r.alcanzaron,
-      conv,
-      drill: dealsDrill(`Alcanzaron “${r.etapa}” o más`, team.filter((d) => effRank(d) >= r.rank_etapa)),
-    };
-  });
+export function buildVentaGraficas(
+  raw: { funnelRows: FunnelRow[]; pipeRows: PipelineActualRow[]; motivoRows: MotivoRow[]; deals: DealRow[] },
+  filters: Filters
+): VentaGraficas {
+  const { funnelRows, pipeRows, motivoRows, deals } = raw;
+  // Equipo AE + PERIODO (por fecha de cierre) → conteos coherentes con el filtro global.
+  const team = deals
+    .filter((d) => isAeVenta(d.owner_id))
+    .filter((d) => inPeriodo(cierre(d), filters.periodo));
 
-  const pipeline: PipelineBar[] = pipeRows.map((r) => ({
+  // Embudo (recorrido): alcanzaron[i] = deals con effRank >= rank de la etapa i (recalculado).
+  const alcanzaron = funnelRows.map((r) => team.filter((d) => effRank(d) >= r.rank_etapa).length);
+  const funnel: FunnelStage[] = funnelRows.map((r, i) => ({
+    rank: r.rank_etapa,
     etapa: r.etapa,
-    deals: r.deals,
-    mrr: r.mrr,
-    cat: r.etapa === "Ganado" ? "ganado" : r.etapa === "Perdido" ? "perdido" : "activo",
-    drill: dealsDrill(`Deals en “${r.etapa}”`, team.filter((d) => d.etapa === r.etapa)),
+    alcanzaron: alcanzaron[i],
+    conv: i === 0 ? 1 : alcanzaron[i - 1] > 0 ? alcanzaron[i] / alcanzaron[i - 1] : null,
+    drill: dealsDrill(`Alcanzaron “${r.etapa}” o más`, team.filter((d) => effRank(d) >= r.rank_etapa)),
   }));
 
-  const motivos: MotivoBar[] = motivoRows.map((r) => ({
-    motivo: r.motivo,
-    deals: r.deals,
-    drill: dealsDrill(`Perdidos: ${r.motivo}`, team.filter((d) => d.etapa === "Perdido" && dealMotivo(d) === r.motivo)),
-  }));
+  // Pipeline por etapa (conteo + MRR desde deals filtrados). Oculta etapas sin deals.
+  const pipeline: PipelineBar[] = pipeRows
+    .map((r) => {
+      const t = team.filter((d) => d.etapa === r.etapa);
+      return {
+        etapa: r.etapa,
+        deals: t.length,
+        mrr: t.reduce((s, d) => s + (d.mrr ?? 0), 0),
+        cat: (r.etapa === "Ganado" ? "ganado" : r.etapa === "Perdido" ? "perdido" : "activo") as PipelineBar["cat"],
+        drill: dealsDrill(`Deals en “${r.etapa}”`, t),
+      };
+    })
+    .filter((r) => r.deals > 0);
+
+  // Motivos de pérdida (desde perdidos filtrados). Oculta motivos sin deals.
+  const motivos: MotivoBar[] = motivoRows
+    .map((r) => {
+      const t = team.filter((d) => d.etapa === "Perdido" && dealMotivo(d) === r.motivo);
+      return { motivo: r.motivo, deals: t.length, drill: dealsDrill(`Perdidos: ${r.motivo}`, t) };
+    })
+    .filter((r) => r.deals > 0);
 
   return { isEmpty: team.length === 0, funnel, pipeline, motivos };
 }

@@ -5,6 +5,10 @@
 import type { Kpi, ChartSpec, DrillPayload, DealRow, MetaRow, PipelineObjetivoRow } from "./types";
 import { fetchDeals, fetchMetas, fetchPipelineObjetivo } from "./db";
 import { isAeVenta, aeLabel } from "./team";
+import { inPeriodo, type Filters } from "./filters";
+
+// Fecha de cierre del deal para el filtro de PERIODO: firma (ganados) o cierre estimado.
+const cierreDate = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
 
 // Paleta espectro Sento para series de gráficas (no-semáforo).
 const C = {
@@ -75,11 +79,14 @@ export type VentaData = {
 export function buildVenta(
   deals: DealRow[],
   metas: MetaRow[],
-  pipe: PipelineObjetivoRow | null
+  pipe: PipelineObjetivoRow | null,
+  filters: Filters
 ): VentaData {
   // Filtro de equipo por IDENTIFICADOR ESTABLE: solo deals cuyos owner_id ∈ AEs.
-  // Registros fuera del equipo (o sin owner_id) quedan EXCLUIDOS, sin romper.
-  const teamDeals = deals.filter((d) => isAeVenta(d.owner_id));
+  // + Filtro de PERIODO (global) por fecha de cierre (firma/estimada). Se SUMAN al base.
+  const teamDeals = deals
+    .filter((d) => isAeVenta(d.owner_id))
+    .filter((d) => inPeriodo(cierreDate(d), filters.periodo));
 
   const open = teamDeals.filter(isOpen);
   const ganados = teamDeals.filter((d) => d.etapa === "Ganado");
@@ -232,7 +239,12 @@ export function buildVenta(
   };
 }
 
-export async function loadVentaData(): Promise<VentaData> {
+// Fetch CRUDO (una vez). La página construye con useMemo(buildVenta(raw, filters)).
+export async function fetchVentaRaw(): Promise<{
+  deals: DealRow[];
+  metas: MetaRow[];
+  pipe: PipelineObjetivoRow | null;
+}> {
   const [deals, metas, pipe] = await Promise.all([fetchDeals(), fetchMetas(), fetchPipelineObjetivo()]);
-  return buildVenta(deals, metas, pipe);
+  return { deals, metas, pipe };
 }

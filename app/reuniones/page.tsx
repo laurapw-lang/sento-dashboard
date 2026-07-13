@@ -7,10 +7,17 @@ import { ChartCard } from "@/components/ChartCard";
 import { Pill } from "@/components/Badge";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/DataState";
 import { useAsync } from "@/lib/useAsync";
-import { loadReunionesData } from "@/lib/reuniones";
+import { useFilters } from "@/lib/filters";
+import { fetchReunionesRaw, buildReuniones } from "@/lib/reuniones";
+import { useMemo } from "react";
 
 export default function ReunionesPage() {
-  const { loading, error, data } = useAsync(loadReunionesData);
+  const { loading, error, data: raw } = useAsync(fetchReunionesRaw);
+  const { filters, activeCount } = useFilters();
+  const data = useMemo(
+    () => (raw ? buildReuniones(raw.reuniones, raw.metas, filters) : null),
+    [raw, filters]
+  );
 
   return (
     <>
@@ -29,7 +36,9 @@ export default function ReunionesPage() {
         {!loading && !error && data && (
           <>
             {data.isEmpty && (
-              <Pill tone="warn">v_reuniones sin filas — se muestran metas y ceros</Pill>
+              <Pill tone="warn">
+                {activeCount > 0 ? "Sin resultados para este filtro" : "v_reuniones sin filas — se muestran metas y ceros"}
+              </Pill>
             )}
 
             <section>

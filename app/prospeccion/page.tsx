@@ -10,16 +10,21 @@ import { PageBody, SectionTitle } from "@/components/PageBody";
 import { Pill } from "@/components/Badge";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/DataState";
 import { useAsync } from "@/lib/useAsync";
-import { loadProspeccion, etapasDe, type Row } from "@/lib/prospeccion";
+import { useFilters } from "@/lib/filters";
+import { fetchProspeccionRaw, buildProspeccion, etapasDe, type Row } from "@/lib/prospeccion";
 import { CanalFunnel } from "@/components/prospeccion/CanalFunnel";
 import { SegmentoReunion } from "@/components/prospeccion/SegmentoReunion";
 import { Entregabilidad } from "@/components/prospeccion/Entregabilidad";
+import { useMemo } from "react";
 
 const FASE1 = "Sin datos aún — se poblarán cuando las campañas envíen (Fase 1)";
 const n = (v: any) => (v == null ? 0 : Number(v) || 0);
 
 export default function ProspeccionPage() {
-  const { loading, error, data } = useAsync(loadProspeccion);
+  const { loading, error, data: raw } = useAsync(fetchProspeccionRaw);
+  const { filters, activeCount } = useFilters();
+  const data = useMemo(() => (raw ? buildProspeccion(raw, filters) : null), [raw, filters]);
+  const emptyLabel = activeCount > 0 ? "Sin resultados para este filtro" : FASE1;
 
   return (
     <>
@@ -43,7 +48,7 @@ export default function ProspeccionPage() {
               <SectionTitle>Funnel por canal</SectionTitle>
               {data.prospEmpty ? (
                 <div className="mt-3">
-                  <EmptyBlock label={FASE1} />
+                  <EmptyBlock label={emptyLabel} />
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -58,7 +63,7 @@ export default function ProspeccionPage() {
               <SectionTitle>Comparativa de canales</SectionTitle>
               {data.prospEmpty ? (
                 <div className="mt-3">
-                  <EmptyBlock label={FASE1} />
+                  <EmptyBlock label={emptyLabel} />
                 </div>
               ) : (
                 <ComparativaCanales rows={data.canal} />
@@ -76,7 +81,7 @@ export default function ProspeccionPage() {
               <SectionTitle>Entregabilidad</SectionTitle>
               {data.deliverabilityEmpty ? (
                 <div className="mt-3">
-                  <EmptyBlock label={FASE1} />
+                  <EmptyBlock label={emptyLabel} />
                 </div>
               ) : (
                 <Entregabilidad dominios={data.deliverability} resumen={data.deliverabilityResumen} />
@@ -90,7 +95,7 @@ export default function ProspeccionPage() {
                 <AbTabla rows={data.ab} />
               ) : (
                 <div className="mt-3">
-                  <EmptyBlock label={FASE1} />
+                  <EmptyBlock label={emptyLabel} />
                 </div>
               )}
             </section>
