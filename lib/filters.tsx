@@ -66,6 +66,11 @@ export function inPeriodo(dateStr: string | null | undefined, p: Periodo): boole
   return true;
 }
 
+// ¿La fila pasa el filtro Vertical? "Todas" = sin filtro. Compara contra el enum vertical.
+export function matchVertical(v: string | null | undefined, filters: Filters): boolean {
+  return filters.vertical === "Todas" || v === filters.vertical;
+}
+
 // Etiqueta legible del periodo activo (para el indicador de filtros).
 export function periodoLabel(p: Periodo): string {
   const map: Record<string, string> = {

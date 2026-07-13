@@ -5,7 +5,7 @@
 import type { Kpi, ChartSpec, DrillPayload, ReunionRow, MetaRow } from "./types";
 import { fetchReuniones, fetchMetas } from "./db";
 import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM } from "./team";
-import { inPeriodo, type Filters } from "./filters";
+import { inPeriodo, matchVertical, type Filters } from "./filters";
 
 // Paleta espectro Sento para series (no-semáforo): real vs meta bien diferenciables.
 const C = {
@@ -61,7 +61,9 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
   // (agendado_por_option_id ∈ REUNIONES_TEAM). Fuera del equipo → EXCLUIDO, sin romper.
   // + Filtro de PERIODO (global) por fecha_reunion. Se SUMA al filtro de equipo base.
   const teamAll = reuniones.filter((r) => isReunionesTeam(r.agendado_por_option_id));
-  const teamReuniones = teamAll.filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+  const teamReuniones = teamAll
+    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo))
+    .filter((r) => matchVertical(r.vertical, filters));
 
   // Nota interpretativa: cuántas agendadas del equipo quedan fuera por no tener fecha_reunion.
   const periodoActivo = filters.periodo.preset !== "todo";

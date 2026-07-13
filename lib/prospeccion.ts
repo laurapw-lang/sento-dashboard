@@ -5,7 +5,7 @@
 // (v_deliverability) no tienen grano de fecha → el Periodo no las afecta (nota en la UI).
 
 import { fetchView } from "./db";
-import { inPeriodo, type Filters } from "./filters";
+import { inPeriodo, matchVertical, type Filters } from "./filters";
 import { isReunionesTeam } from "./team";
 
 export type Row = Record<string, any>;
@@ -44,8 +44,10 @@ export type ProspeccionData = {
 const CANALES = ["LinkedIn", "Email"];
 
 export function buildProspeccion(raw: ProspeccionRaw, filters: Filters): ProspeccionData {
-  // fact_prospeccion filtrado por PERIODO (fecha). (vertical/carril/canal: partes siguientes)
-  const rows = raw.prospeccion.filter((r) => inPeriodo(r.fecha, filters.periodo));
+  // fact_prospeccion filtrado por PERIODO (fecha) + VERTICAL. (carril/canal: partes siguientes)
+  const rows = raw.prospeccion
+    .filter((r) => inPeriodo(r.fecha, filters.periodo))
+    .filter((r) => matchVertical(r.vertical, filters));
   const sumFor = (canal: string, key: string) =>
     rows.filter((r) => r.canal === canal).reduce((s, r) => s + num(r[key]), 0);
   const canalesConDatos = CANALES.filter((c) => sumFor(c, "contactados") > 0);
@@ -127,7 +129,8 @@ export function buildProspeccion(raw: ProspeccionRaw, filters: Filters): Prospec
   }
   const reunTeam = raw.reuniones
     .filter((r) => isReunionesTeam(r.agendado_por_option_id))
-    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo))
+    .filter((r) => matchVertical(r.vertical, filters));
   for (const r of reunTeam) {
     const k = `${r.vertical}||${r.carril}`;
     const s = seg(k);

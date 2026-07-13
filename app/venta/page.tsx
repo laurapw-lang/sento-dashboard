@@ -20,11 +20,14 @@ export default function VentaPage() {
   const { open } = useDrilldown();
   const { filters, activeCount } = useFilters();
   const periodoActivo = filters.periodo.preset !== "todo";
-  // Nota interpretativa: hoy los deals no tienen fecha de cierre en el CRM, así que el
-  // filtro de Periodo (por fecha de cierre) los excluye a todos.
-  const ventaVaciaPorFecha = periodoActivo
-    ? "Sin deals con fecha de cierre en el periodo. Los deals aún no tienen fecha de cierre capturada en Pipedrive, así que el filtro de Periodo los excluye — quítalo para ver el pipeline."
-    : "Sin deals de Operación México en fact_deals todavía";
+  // Mensaje de vacío según la causa: sin filtros, por Periodo (fechas de cierre en null hoy),
+  // o por otro filtro (ej. Vertical sin deals).
+  const ventaVaciaPorFecha =
+    activeCount === 0
+      ? "Sin deals de Operación México en fact_deals todavía"
+      : periodoActivo
+      ? "Sin deals con fecha de cierre en el periodo. Los deals aún no tienen fecha de cierre capturada en Pipedrive, así que el filtro de Periodo los excluye — quítalo para ver el pipeline."
+      : "Sin resultados para este filtro";
   const { loading, error, data: rawData } = useAsync(fetchVentaRaw);
   const gRaw = useAsync(fetchVentaGraficasRaw);
   const data = useMemo(
