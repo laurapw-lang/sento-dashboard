@@ -5,7 +5,7 @@
 import type { DealRow, DrillPayload, FunnelRow, PipelineActualRow, MotivoRow } from "./types";
 import { fetchFunnelJourney, fetchPipelineActual, fetchPerdidasMotivo, fetchDeals } from "./db";
 import { isAeVenta, aeLabel } from "./team";
-import { inPeriodo, matchVertical, matchCarril, type Filters } from "./filters";
+import { inPeriodo, matchVertical, matchCarril, matchAE, type Filters } from "./filters";
 
 const cierre = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
 
@@ -88,7 +88,8 @@ export function buildVentaGraficas(
     .filter((d) => isAeVenta(d.owner_id))
     .filter((d) => inPeriodo(cierre(d), filters.periodo))
     .filter((d) => matchVertical(d.vertical, filters))
-    .filter((d) => matchCarril(d.carril, filters));
+    .filter((d) => matchCarril(d.carril, filters))
+    .filter((d) => matchAE(aeLabel(d.owner_id, d.ae), filters));
 
   // Embudo (recorrido): alcanzaron[i] = deals con effRank >= rank de la etapa i (recalculado).
   const alcanzaron = funnelRows.map((r) => team.filter((d) => effRank(d) >= r.rank_etapa).length);

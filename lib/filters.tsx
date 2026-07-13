@@ -76,6 +76,13 @@ export function matchCarril(c: string | null | undefined, filters: Filters): boo
   return filters.carril === "Todos" || c === filters.carril;
 }
 
+// ¿La fila pasa el filtro AE? "Todos" = sin filtro. AE = OWNER del deal (quien cierra).
+// Se compara por NOMBRE canónico del AE: en Venta pasar aeLabel(owner_id); en Reuniones
+// pasar v_reuniones.ae (ya coincide con los nombres canónicos). NO aplica a Prospección.
+export function matchAE(aeName: string | null | undefined, filters: Filters): boolean {
+  return filters.ae === "Todos" || aeName === filters.ae;
+}
+
 // Etiqueta legible del periodo activo (para el indicador de filtros).
 export function periodoLabel(p: Periodo): string {
   const map: Record<string, string> = {

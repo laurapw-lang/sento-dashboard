@@ -5,6 +5,7 @@
 // Nota de build incremental: en esta primera parte SOLO Periodo filtra la data;
 // Vertical/AE/Carril/Origen se cablean en las siguientes partes.
 
+import { usePathname } from "next/navigation";
 import { useFilters, periodoLabel, type Periodo } from "@/lib/filters";
 
 const PERIODO_OPTS: { value: Periodo["preset"]; label: string }[] = [
@@ -23,13 +24,23 @@ const SIMPLE: { key: "vertical" | "ae" | "carril" | "origen"; label: string; opt
   { key: "origen", label: "Origen", options: ["Todos", "Andrés Sanjuán", "Laura Peña", "Zalesmachine", "Edgardo Velasquez", "Michelle Sosa"] },
 ];
 
-function Selector({ label, value, options, onChange, active }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void; active: boolean;
+function Selector({ label, value, options, onChange, active, disabled }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void; active: boolean; disabled?: boolean;
 }) {
   return (
-    <label className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs shadow-card transition-colors focus-within:border-[#3FA9FF] ${active ? "border-[#3FA9FF] bg-[#3FA9FF]/8" : "border-line bg-card"}`}>
+    <label
+      title={disabled ? `${label} no aplica en esta sección` : undefined}
+      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs shadow-card transition-colors focus-within:border-[#3FA9FF] ${
+        disabled ? "border-line bg-canvas opacity-50" : active ? "border-[#3FA9FF] bg-[#3FA9FF]/8" : "border-line bg-card"
+      }`}
+    >
       <span className="hidden text-ink-muted sm:inline">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="cursor-pointer bg-transparent text-xs font-semibold text-ink outline-none">
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={`bg-transparent text-xs font-semibold text-ink outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+      >
         {options.map((o) => (
           <option key={o} value={o}>{o}</option>
         ))}
@@ -40,8 +51,11 @@ function Selector({ label, value, options, onChange, active }: {
 
 export function Topbar({ title }: { title: string }) {
   const { filters, set, setPeriodo, reset, activeCount } = useFilters();
+  const pathname = usePathname();
   const p = filters.periodo;
   const periodoActive = p.preset !== "todo";
+  // AE no aplica en Prospección (datos agregados por campaña, sin dimensión AE) → deshabilitado.
+  const noAplica = (key: string) => key === "ae" && pathname === "/prospeccion";
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-canvas/80 px-6 py-3 backdrop-blur-md">
@@ -82,6 +96,7 @@ export function Topbar({ title }: { title: string }) {
               options={f.options}
               onChange={(v) => set({ [f.key]: v } as any)}
               active={filters[f.key] !== f.options[0]}
+              disabled={noAplica(f.key)}
             />
           ))}
 
