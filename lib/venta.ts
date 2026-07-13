@@ -5,7 +5,7 @@
 import type { Kpi, ChartSpec, DrillPayload, DealRow, MetaRow, PipelineObjetivoRow } from "./types";
 import { fetchDeals, fetchMetas, fetchPipelineObjetivo } from "./db";
 import { isAeVenta, aeLabel } from "./team";
-import { inPeriodo, matchVertical, type Filters } from "./filters";
+import { inPeriodo, matchVertical, matchCarril, type Filters } from "./filters";
 
 // Fecha de cierre del deal para el filtro de PERIODO: firma (ganados) o cierre estimado.
 const cierreDate = (d: DealRow) => d.fecha_firma ?? d.fecha_cierre_est;
@@ -87,7 +87,8 @@ export function buildVenta(
   const teamDeals = deals
     .filter((d) => isAeVenta(d.owner_id))
     .filter((d) => inPeriodo(cierreDate(d), filters.periodo))
-    .filter((d) => matchVertical(d.vertical, filters));
+    .filter((d) => matchVertical(d.vertical, filters))
+    .filter((d) => matchCarril(d.carril, filters));
 
   const open = teamDeals.filter(isOpen);
   const ganados = teamDeals.filter((d) => d.etapa === "Ganado");

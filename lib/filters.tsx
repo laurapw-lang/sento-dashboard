@@ -71,6 +71,11 @@ export function matchVertical(v: string | null | undefined, filters: Filters): b
   return filters.vertical === "Todas" || v === filters.vertical;
 }
 
+// ¿La fila pasa el filtro Carril? "Todos" = sin filtro. Compara contra el enum carril.
+export function matchCarril(c: string | null | undefined, filters: Filters): boolean {
+  return filters.carril === "Todos" || c === filters.carril;
+}
+
 // Etiqueta legible del periodo activo (para el indicador de filtros).
 export function periodoLabel(p: Periodo): string {
   const map: Record<string, string> = {
