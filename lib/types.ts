@@ -44,9 +44,10 @@ export type DealRow = {
   max_stage_id: number | null; // stage_id de la etapa máxima alcanzada (embudo)
   max_stage: string | null; // nombre de esa etapa
   fecha_reunion: string | null;
-  fecha_firma: string | null; // cierre real (ganados)
+  fecha_firma: string | null; // cierre real (ganados) = won_time (fecha de Ganado)
   fecha_cierre_est: string | null; // cierre estimado (abiertos)
   agendado_por_option_id: string | null; // quién trajo el lead (option_id ESTABLE) — filtro Origen
+  canal_entrada: string | null; // canal de entrada del deal (LinkedIn/Email/WhatsApp/Llamada/Evento/Referido) | null
 };
 
 // Filas de las vistas de gráficas de Venta

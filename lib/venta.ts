@@ -35,6 +35,13 @@ const STAGE_ORDER = [
 const n = (x: number | null | undefined) => x ?? 0;
 const isOpen = (d: DealRow) => d.etapa !== "Ganado" && d.etapa !== "Perdido";
 
+// Canal de entrada: los deals sin el campo lleno se agrupan como "Sin clasificar".
+const canalOf = (d: DealRow) => d.canal_entrada || "Sin clasificar";
+// Orden de presentación estable (los conocidos primero; "Sin clasificar" al final).
+const CANAL_ORDER = ["LinkedIn", "Email", "WhatsApp", "Llamada", "Evento", "Referido", "Sin clasificar"];
+const resultadoCat = (d: DealRow): "ganado" | "perdido" | "activo" =>
+  d.etapa === "Ganado" ? "ganado" : d.etapa === "Perdido" ? "perdido" : "activo";
+
 function sumBy(rows: DealRow[], keyOf: (d: DealRow) => string, valOf: (d: DealRow) => number) {
   const m = new Map<string, number>();
   for (const r of rows) {
@@ -52,6 +59,7 @@ function dealsDrill(title: string, rows: DealRow[]): DrillPayload {
       { key: "deal_id", label: "Deal" },
       { key: "cuenta", label: "Cuenta", type: "dealLink" },
       { key: "etapa", label: "Etapa" },
+      { key: "canal", label: "Canal" },
       { key: "vertical", label: "Vertical" },
       { key: "carril", label: "Carril" },
       { key: "mrr", label: "MRR", align: "right" },
@@ -61,6 +69,7 @@ function dealsDrill(title: string, rows: DealRow[]): DrillPayload {
       deal_id: d.deal_id,
       cuenta: d.cuenta,
       etapa: d.etapa,
+      canal: canalOf(d),
       vertical: d.vertical,
       carril: d.carril,
       mrr: n(d.mrr),
@@ -194,6 +203,46 @@ export function buildVenta(
     data: sumBy(open, (d) => d.vertical ?? "Sin definir", (d) => n(d.mrr)).map(([vertical, mrr]) => ({ vertical, mrr })),
   };
 
+  // ---- Canal de entrada (distribución + cruce con resultado) ----
+  // Se construye desde teamDeals (TODOS los deals filtrados: abiertos + ganados + perdidos),
+  // no solo abiertos, para que el cruce por resultado tenga sentido. "Sin clasificar" = sin canal.
+  const canalesPresentes = CANAL_ORDER.filter((c) => teamDeals.some((d) => canalOf(d) === c));
+
+  const canalDistribucion: ChartSpec = {
+    id: "canal_distribucion",
+    title: "Deals por canal de entrada",
+    type: "funnel", // barras horizontales (buena lectura de etiquetas de canal)
+    xKey: "canal",
+    series: [{ key: "deals", label: "Deals", color: C.cyan }],
+    drill: dealsDrill("Deals por canal de entrada", teamDeals),
+    data: canalesPresentes.map((canal) => ({
+      canal,
+      deals: teamDeals.filter((d) => canalOf(d) === canal).length,
+    })),
+  };
+
+  const canalResultado: ChartSpec = {
+    id: "canal_resultado",
+    title: "Canal de entrada por resultado",
+    type: "bar",
+    xKey: "canal",
+    series: [
+      { key: "activo", label: "Activos", color: "#3FA9FF" },
+      { key: "ganado", label: "Ganados", color: "#1D9E75" },
+      { key: "perdido", label: "Perdidos", color: "#E24B4A" },
+    ],
+    drill: dealsDrill("Deals por canal y resultado", teamDeals),
+    data: canalesPresentes.map((canal) => {
+      const enCanal = teamDeals.filter((d) => canalOf(d) === canal);
+      return {
+        canal,
+        activo: enCanal.filter((d) => resultadoCat(d) === "activo").length,
+        ganado: enCanal.filter((d) => resultadoCat(d) === "ganado").length,
+        perdido: enCanal.filter((d) => resultadoCat(d) === "perdido").length,
+      };
+    }),
+  };
+
   // ---- Tablas ----
   const atencion = open
     .filter((d) => n(d.dias_en_etapa) >= 14 || n(d.dias_sin_actividad) >= 10)
@@ -239,7 +288,7 @@ export function buildVenta(
   return {
     isEmpty: teamDeals.length === 0,
     kpis,
-    charts: [embudo, forecast, porAe, porOrigen, porVertical],
+    charts: [embudo, forecast, porAe, porOrigen, porVertical, canalDistribucion, canalResultado],
     dealsAtencion,
     razonesPerdida,
   };
