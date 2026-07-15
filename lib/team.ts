@@ -72,3 +72,18 @@ export function matchOrigen(rowOptionId: string | null | undefined, selectedName
   const id = ORIGEN_ID_BY_NAME[selectedName];
   return id != null && String(rowOptionId ?? "") === id;
 }
+
+/**
+ * Entidad de la tabla `metas` (metaEntidad) que corresponde al Origen seleccionado.
+ * Las metas de reuniones son metas de SETTER ("quién agendó") → se unen por Origen.
+ * Devuelve null cuando el Origen elegido NO tiene meta de reuniones definida:
+ *   - "Otro" (260): no es del equipo.
+ *   - "Andrés Sanjuán" (249): es setter pero sin meta en el seed (metaEntidad = null).
+ * Deriva de REUNIONES_TEAM para mantener una sola fuente de verdad del mapeo.
+ */
+export function metaEntidadForOrigen(selectedName: string): string | null {
+  const id = ORIGEN_ID_BY_NAME[selectedName];
+  if (!id) return null;
+  const m = REUNIONES_TEAM.find((t) => t.optionId === id);
+  return m ? m.metaEntidad : null;
+}

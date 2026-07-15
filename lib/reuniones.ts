@@ -4,7 +4,7 @@
 
 import type { Kpi, ChartSpec, DrillPayload, ReunionRow, MetaRow } from "./types";
 import { fetchReuniones, fetchMetas } from "./db";
-import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM, matchOrigen } from "./team";
+import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM, matchOrigen, metaEntidadForOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, type Filters } from "./filters";
 
 // Paleta espectro Sento para series (no-semáforo): real vs meta bien diferenciables.
@@ -55,6 +55,8 @@ export type ReunionesData = {
   mensual: ChartSpec | null;
   calificacionPendiente: boolean; // true = calificación sin confirmar (graban_llamadas vacío en CRM)
   periodoNota: string | null; // aviso si el periodo excluye reuniones sin fecha
+  proximasCount: number; // reuniones agendadas para DESPUÉS de hoy (futuras con fecha)
+  proximas: DrillPayload; // listado de próximas (cuenta clickeable, fecha, AE, setter), asc por fecha
 };
 
 export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filters: Filters): ReunionesData {
@@ -85,12 +87,36 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
   const showRate = agendadas.length ? realizadas.length / agendadas.length : 0;
   const tasaCalif = agendadas.length ? calificadas.length / agendadas.length : 0;
 
-  // Metas también filtradas por PERIODO (por su 'periodo' mensual) → el headline compara
-  // real vs la meta del rango elegido (no siempre el plan completo).
+  // Metas filtradas por PERIODO (por su 'periodo' mensual) Y por PERSONA (Origen = setter).
+  // Las metas de reuniones son metas de "quién agendó", así que la meta del headline sigue
+  // el filtro ORIGEN para comparar manzanas con manzanas:
+  //   Origen = persona → SU meta del período · Origen = Todos → suma del equipo.
+  // El filtro AE (owner del deal) NO ajusta la meta: es otra dimensión sin meta propia.
   const metasReu = metas
     .filter((m) => m.tipo_meta === "reuniones")
     .filter((m) => inPeriodo(m.periodo, filters.periodo));
-  const metaTotal = metasReu.reduce((s, m) => s + (m.meta_valor ?? 0), 0);
+  const origenSel = filters.origen;
+  const origenTodos = !origenSel || origenSel === "Todos";
+  const metaEntidadSel = origenTodos ? null : metaEntidadForOrigen(origenSel);
+  // Origen con persona pero sin meta (Otro / Andrés) → [] → sin meta comparable.
+  const metasReuFiltradas = origenTodos
+    ? metasReu
+    : metaEntidadSel
+    ? metasReu.filter((m) => m.entidad === metaEntidadSel)
+    : [];
+  const metaTotal = metasReuFiltradas.reduce((s, m) => s + (m.meta_valor ?? 0), 0);
+  const metaAmbito = origenTodos
+    ? "equipo completo"
+    : metaEntidadSel ?? `${origenSel} — sin meta definida`;
+
+  // Meta de AGENDADAS (tipo_meta='reuniones_agendadas'), MISMA regla Periodo + Origen que
+  // realizadas: Origen=Todos → suma equipo · Origen=persona con meta → su meta · sin meta → 0.
+  const metasAgeReu = metas
+    .filter((m) => m.tipo_meta === "reuniones_agendadas")
+    .filter((m) => inPeriodo(m.periodo, filters.periodo));
+  const metaAgendadasTotal = (
+    origenTodos ? metasAgeReu : metaEntidadSel ? metasAgeReu.filter((m) => m.entidad === metaEntidadSel) : []
+  ).reduce((s, m) => s + (m.meta_valor ?? 0), 0);
 
   const kpis: Kpi[] = [
     {
@@ -99,14 +125,16 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
       value: califRealizadas.length,
       meta: metaTotal || null,
       unit: "int",
-      hint: "Métrica principal · cumulativo vs plan jul–dic (filtro por mes se cablea después)",
+      hint: `Métrica principal · meta = ${metaAmbito}, ajustada al período y al filtro de persona (Origen).`,
       drill: reunionesDrill("Calificadas realizadas", califRealizadas),
     },
     {
       id: "agendadas",
-      label: "Agendadas totales",
+      label: "Agendadas vs meta",
       value: agendadas.length,
+      meta: metaAgendadasTotal || null,
       unit: "int",
+      hint: `Reuniones agendadas · meta = ${metaAmbito}, ajustada al período y al filtro de persona (Origen).`,
       drill: reunionesDrill("Reuniones agendadas", agendadas),
     },
     {
@@ -172,6 +200,39 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
       }
     : null;
 
+  // ---- Reuniones PRÓXIMAS: agendadas para DESPUÉS de hoy (fecha_reunion > hoy) ----
+  // Reactivas a los filtros de SEGMENTO (vertical/carril/AE/Origen), NO al filtro de Periodo:
+  // "próximas" define su propia ventana temporal (el futuro), así que el preset de período
+  // (este mes / mes pasado) no aplica aquí. Orden ascendente = la más próxima primero.
+  const hd = new Date();
+  const hoy = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, "0")}-${String(hd.getDate()).padStart(2, "0")}`;
+  const proximasRows = teamAll
+    .filter((r) => r.fecha_reunion && String(r.fecha_reunion).slice(0, 10) > hoy)
+    .filter((r) => matchVertical(r.vertical, filters))
+    .filter((r) => matchCarril(r.carril, filters))
+    .filter((r) => matchAE(r.ae, filters))
+    .filter((r) => matchOrigen(r.agendado_por_option_id, filters.origen))
+    .sort((a, b) => String(a.fecha_reunion).localeCompare(String(b.fecha_reunion)));
+  const proximas: DrillPayload = {
+    title: "Reuniones próximas",
+    subtitle: `${proximasRows.length} próxima(s) · después de ${hoy}`,
+    columns: [
+      { key: "cuenta", label: "Cuenta", type: "dealLink" },
+      { key: "fecha", label: "Fecha reunión" },
+      { key: "ae", label: "AE" },
+      { key: "setter", label: "Agendó" },
+      { key: "etapa", label: "Etapa" },
+    ],
+    rows: proximasRows.map((r) => ({
+      deal_id: r.deal_id,
+      cuenta: r.cuenta,
+      fecha: r.fecha_reunion ? String(r.fecha_reunion).slice(0, 10) : "—",
+      ae: r.ae,
+      setter: reunionesLabel(r.agendado_por_option_id, r.agendado_por),
+      etapa: r.etapa,
+    })),
+  };
+
   // ---- por canal: sin datos (v_reuniones no tiene canal aún) ----
   const porCanal: ChartSpec | null = null;
 
@@ -185,12 +246,12 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
         xKey: "mes",
         series: [
           { key: "real", label: "Calif. realizadas", color: C.fuchsia },
-          { key: "meta", label: "Meta equipo", color: C.violet },
+          { key: "meta", label: origenTodos ? "Meta equipo" : `Meta ${metaAmbito}`, color: C.violet },
         ],
         data: periodos.map((p) => ({
           mes: monthLabel(p),
           real: califRealizadas.filter((r) => r.mes_reunion === p).length,
-          meta: metasReu.filter((m) => m.periodo === p).reduce((s, m) => s + (m.meta_valor ?? 0), 0),
+          meta: metasReuFiltradas.filter((m) => m.periodo === p).reduce((s, m) => s + (m.meta_valor ?? 0), 0),
         })),
       }
     : null;
@@ -203,6 +264,8 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     mensual,
     calificacionPendiente,
     periodoNota,
+    proximasCount: proximasRows.length,
+    proximas,
   };
 }
 

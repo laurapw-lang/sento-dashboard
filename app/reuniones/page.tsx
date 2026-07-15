@@ -4,6 +4,7 @@ import { Topbar } from "@/components/Topbar";
 import { PageBody, SectionTitle } from "@/components/PageBody";
 import { KpiCard } from "@/components/KpiCard";
 import { ChartCard } from "@/components/ChartCard";
+import { DataTable } from "@/components/DataTable";
 import { Pill } from "@/components/Badge";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/DataState";
 import { useAsync } from "@/lib/useAsync";
@@ -59,6 +60,21 @@ export default function ReunionesPage() {
                   estricta). El <strong className="text-ink">0</strong> = dato faltante, no bajo desempeño.
                 </p>
               )}
+            </section>
+
+            <section>
+              <div className="flex items-center gap-2">
+                <SectionTitle>Reuniones próximas</SectionTitle>
+                <Pill tone={data.proximasCount > 0 ? "ok" : "info"}>{data.proximasCount}</Pill>
+              </div>
+              <p className="mt-1 text-xs text-ink-muted">Agendadas para después de hoy, la más próxima primero.</p>
+              <div className="mt-3">
+                {data.proximas.rows.length ? (
+                  <DataTable columns={data.proximas.columns} rows={data.proximas.rows} />
+                ) : (
+                  <EmptyBlock label="No hay reuniones próximas (ninguna fecha futura agendada)" />
+                )}
+              </div>
             </section>
 
             <section>
