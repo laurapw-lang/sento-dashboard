@@ -1,6 +1,6 @@
 // Tipos compartidos del dashboard (mock por ahora; el shape refleja el modelo real).
 
-export type Column = { key: string; label: string; align?: "left" | "right"; type?: "dealLink" };
+export type Column = { key: string; label: string; align?: "left" | "right"; type?: "dealLink"; hint?: string };
 
 export type DrillPayload = {
   title: string;
@@ -60,6 +60,7 @@ export type ReunionRow = {
   cuenta: string | null;
   mes_reunion: string | null; // 'YYYY-MM-DD' (primer día del mes) o null
   fecha_reunion: string | null;
+  fecha_agendado: string | null; // 'YYYY-MM-DD' = stage_change_time truncado (aprox. de "agendado"; ver v_reuniones/T14)
   agendado_por: string | null; // label (etiqueta)
   agendado_por_option_id: string | null; // option_id ESTABLE — filtro de equipo REUNIONES
   ae: string | null;

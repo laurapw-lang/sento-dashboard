@@ -16,11 +16,13 @@ export function DataTable({
             {columns.map((c) => (
               <th
                 key={c.key}
+                title={c.hint}
                 className={`whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide ${
                   c.align === "right" ? "text-right" : "text-left"
-                }`}
+                } ${c.hint ? "cursor-help" : ""}`}
               >
                 {c.label}
+                {c.hint && <span className="ml-0.5 text-ink-muted/70">ⓘ</span>}
               </th>
             ))}
           </tr>

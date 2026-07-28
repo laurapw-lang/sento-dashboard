@@ -23,13 +23,23 @@ const monthLabel = (iso: string | null) => {
   return MESES[mm] ?? iso.slice(0, 7);
 };
 
+// Formato de fecha para los drill-downs: YYYY-MM-DD (año-mes-día). null/vacío → "—".
+// Las columnas date de Postgres llegan ya como "YYYY-MM-DD"; se recorta por si trae hora.
+const fmtFecha = (v: string | null): string => (v ? String(v).slice(0, 10) : "—");
+
+// Tooltip de limitación de fecha_agendado (deriva de stage_change_time): exacta solo para
+// deals ahora en Demo Agendada; aproximada (último cambio de etapa) para los que ya avanzaron.
+const HINT_AGENDADO =
+  "Aproximado: es la fecha del último cambio de etapa (stage_change_time). Exacta solo para deals que siguen en Demo Agendada.";
+
 function reunionesDrill(title: string, rows: ReunionRow[]): DrillPayload {
   return {
     title,
     subtitle: `${rows.length} reunión(es)`,
     columns: [
       { key: "cuenta", label: "Cuenta", type: "dealLink" },
-      { key: "mes", label: "Mes" },
+      { key: "fecha_agendado", label: "Fecha agendado", hint: HINT_AGENDADO },
+      { key: "fecha_reunion", label: "Fecha reunión" },
       { key: "agendado_por", label: "Agendó (proxy)" },
       { key: "ae", label: "AE" },
       { key: "es_calificada", label: "Calificada" },
@@ -38,7 +48,8 @@ function reunionesDrill(title: string, rows: ReunionRow[]): DrillPayload {
     rows: rows.map((r) => ({
       deal_id: r.deal_id,
       cuenta: r.cuenta,
-      mes: r.mes_reunion ? r.mes_reunion.slice(0, 7) : "sin fecha",
+      fecha_agendado: fmtFecha(r.fecha_agendado),
+      fecha_reunion: fmtFecha(r.fecha_reunion),
       agendado_por: reunionesLabel(r.agendado_por_option_id, r.agendado_por),
       ae: r.ae,
       es_calificada: r.es_calificada ? "sí" : "no",
@@ -218,6 +229,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     subtitle: `${proximasRows.length} próxima(s) · después de ${hoy}`,
     columns: [
       { key: "cuenta", label: "Cuenta", type: "dealLink" },
+      { key: "fecha_agendado", label: "Fecha agendado", hint: HINT_AGENDADO },
       { key: "fecha", label: "Fecha reunión" },
       { key: "ae", label: "AE" },
       { key: "setter", label: "Agendó" },
@@ -226,7 +238,8 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     rows: proximasRows.map((r) => ({
       deal_id: r.deal_id,
       cuenta: r.cuenta,
-      fecha: r.fecha_reunion ? String(r.fecha_reunion).slice(0, 10) : "—",
+      fecha_agendado: fmtFecha(r.fecha_agendado),
+      fecha: fmtFecha(r.fecha_reunion),
       ae: r.ae,
       setter: reunionesLabel(r.agendado_por_option_id, r.agendado_por),
       etapa: r.etapa,
