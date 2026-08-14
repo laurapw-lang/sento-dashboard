@@ -73,27 +73,38 @@ export type ReunionesData = {
 export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filters: Filters): ReunionesData {
   // Filtro de equipo por IDENTIFICADOR ESTABLE: solo reuniones traídas por el equipo
   // (agendado_por_option_id ∈ REUNIONES_TEAM). Fuera del equipo → EXCLUIDO, sin romper.
-  // + Filtro de PERIODO (global) por fecha_reunion. Se SUMA al filtro de equipo base.
   const teamAll = reuniones.filter((r) => isReunionesTeam(r.agendado_por_option_id));
-  const teamReuniones = teamAll
-    .filter((r) => inPeriodo(r.fecha_reunion, filters.periodo))
+
+  // Filtros de SEGMENTO (vertical/carril/AE/Origen) aplican por igual a todas las métricas.
+  const teamSeg = teamAll
     .filter((r) => matchVertical(r.vertical, filters))
     .filter((r) => matchCarril(r.carril, filters))
     .filter((r) => matchAE(r.ae, filters)) // AE = owner del deal (v_reuniones.ae)
     .filter((r) => matchOrigen(r.agendado_por_option_id, filters.origen)); // Origen = setter
 
-  // Nota interpretativa: cuántas agendadas del equipo quedan fuera por no tener fecha_reunion.
+  // El MISMO preset de período se aplica a DOS fechas distintas según la métrica:
+  //   · AGENDADAS  → por fecha_agendado (cuándo se agendó la reunión)
+  //   · REALIZADAS → por fecha_reunion  (cuándo ocurrió la reunión)
+  // Así "este mes" muestra en Agendadas las agendadas este mes, y en Realizadas las
+  // realizadas este mes: un mismo filtro moviendo fechas distintas.
+  const porAgendado = teamSeg.filter((r) => inPeriodo(r.fecha_agendado, filters.periodo));
+  const porReunion = teamSeg.filter((r) => inPeriodo(r.fecha_reunion, filters.periodo));
+
+  // Nota interpretativa: cuántas agendadas del equipo quedan fuera por no tener fecha_agendado
+  // (la fecha por la que ahora se filtran las agendadas).
   const periodoActivo = filters.periodo.preset !== "todo";
-  const sinFecha = teamAll.filter((r) => r.es_agendada && !r.fecha_reunion).length;
+  const sinFecha = teamSeg.filter((r) => r.es_agendada && !r.fecha_agendado).length;
   const periodoNota =
     periodoActivo && sinFecha > 0
-      ? `Periodo activo: ${sinFecha} reunión(es) agendada(s) sin fecha registrada quedan fuera del conteo.`
+      ? `Periodo activo: ${sinFecha} reunión(es) agendada(s) sin fecha de agendado registrada quedan fuera del conteo.`
       : null;
 
-  const agendadas = teamReuniones.filter((r) => r.es_agendada);
-  const realizadas = teamReuniones.filter((r) => r.es_realizada);
-  const calificadas = teamReuniones.filter((r) => r.es_calificada);
-  const califRealizadas = teamReuniones.filter((r) => r.es_calificada_realizada);
+  // Agendadas y sus calificadas → cohorte por fecha_agendado.
+  const agendadas = porAgendado.filter((r) => r.es_agendada);
+  const calificadas = porAgendado.filter((r) => r.es_calificada);
+  // Realizadas y calificadas realizadas → cohorte por fecha_reunion.
+  const realizadas = porReunion.filter((r) => r.es_realizada);
+  const califRealizadas = porReunion.filter((r) => r.es_calificada_realizada);
 
   const showRate = agendadas.length ? realizadas.length / agendadas.length : 0;
   const tasaCalif = agendadas.length ? calificadas.length / agendadas.length : 0;
@@ -177,7 +188,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
   // "Pendiente": hay reuniones agendadas pero NINGUNA tiene graban_llamadas confirmado (=true).
   // Con la regla ESTRICTA, calificadas realizadas = 0 por DATO FALTANTE del CRM, no por desempeño.
   // Se marca el KPI principal como pendiente para que el semáforo no salga rojo alarmante.
-  const grabanMarcados = teamReuniones.filter((r) => r.graban_llamadas != null).length;
+  const grabanMarcados = porReunion.filter((r) => r.graban_llamadas != null).length;
   const calificacionPendiente = califRealizadas.length === 0 && agendadas.length > 0 && grabanMarcados === 0;
   if (calificacionPendiente) {
     kpis[0].pendiente = "Sin confirmar aún (CRM)";
@@ -270,7 +281,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     : null;
 
   return {
-    isEmpty: teamReuniones.length === 0,
+    isEmpty: porAgendado.length === 0 && porReunion.length === 0,
     kpis,
     porPersona,
     porCanal,
