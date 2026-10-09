@@ -1,6 +1,6 @@
 "use client";
 
-import type { FunnelStage } from "@/lib/ventaGraficas";
+import type { FunnelStage } from "@/lib/venta";
 import { useDrilldown } from "../DrillDown";
 
 const pct = (x: number | null) => (x == null ? "—" : `${Math.round(x * 100)}%`);
@@ -13,7 +13,7 @@ export function FunnelJourney({ stages }: { stages: FunnelStage[] }) {
     <div className="rounded-xl border border-line bg-card p-5 shadow-card">
       <div className="mb-4 flex items-center gap-2">
         <span className="h-4 w-1 rounded-full bg-spectrum-gradient" />
-        <h3 className="text-sm font-semibold text-ink">Recorrido del journey (incluye perdidos por su etapa máxima)</h3>
+        <h3 className="text-sm font-semibold text-ink">Hasta dónde llegan los deals (entraron en el periodo)</h3>
       </div>
 
       <div className="space-y-1.5">
@@ -50,7 +50,7 @@ export function FunnelJourney({ stages }: { stages: FunnelStage[] }) {
       </div>
 
       <p className="mt-3 text-[11px] text-ink-muted">
-        Embudo acumulativo: cuántos deals alcanzaron cada etapa o más. Los perdidos cuentan por su etapa máxima. Clic
+        Cuántos deals llegaron a cada etapa o más (los perdidos cuentan hasta donde llegaron). En rojo, los saltos con conversión menor a 50%. Clic
         en una etapa para ver esos deals.
       </p>
     </div>

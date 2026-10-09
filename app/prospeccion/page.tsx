@@ -2,8 +2,8 @@
 
 // Sección Prospección. Lee las vistas reales (v_prospeccion_funnel, v_prospeccion_canal,
 // v_funnel_prospeccion, v_deliverability(+resumen), v_prospeccion_ab).
-// fact_prospeccion está vacía hasta que el Flujo 4 corra (Fase 1) → esas gráficas muestran
-// "sin datos aún". La parte de reuniones (v_funnel_prospeccion) SÍ trae datos reales.
+// fact_prospeccion se alimenta de Smartlead/HeyReach (Flujo 4); el aviso de arriba muestra la
+// fecha del último registro para saber qué tan fresco está.
 
 import { Topbar } from "@/components/Topbar";
 import { PageBody, SectionTitle } from "@/components/PageBody";
@@ -17,26 +17,32 @@ import { SegmentoReunion } from "@/components/prospeccion/SegmentoReunion";
 import { Entregabilidad } from "@/components/prospeccion/Entregabilidad";
 import { useMemo } from "react";
 
-const FASE1 = "Sin datos aún — se poblarán cuando las campañas envíen (Fase 1)";
+const FASE1 = "Sin datos de campañas todavía";
 const n = (v: any) => (v == null ? 0 : Number(v) || 0);
 
 export default function ProspeccionPage() {
   const { loading, error, data: raw } = useAsync(fetchProspeccionRaw);
   const { filters, activeCount } = useFilters();
   const data = useMemo(() => (raw ? buildProspeccion(raw, filters) : null), [raw, filters]);
-  const emptyLabel = activeCount > 0 ? "Sin resultados para este filtro" : FASE1;
+  const ultimoDato = useMemo(
+    () => (raw ? raw.prospeccion.reduce((m: string, r: Row) => (r.fecha && String(r.fecha) > m ? String(r.fecha).slice(0, 10) : m), "") : ""),
+    [raw]
+  );
+  const emptyLabel = ultimoDato || activeCount > 0 ? "Sin actividad en este periodo / filtro — prueba “Mes pasado” o “Todo”" : FASE1;
 
   return (
     <>
-      <Topbar title="Prospección" />
+      <Topbar
+        title="Prospección"
+        subtitle="¿Cuánta gente contactamos por LinkedIn y Email, cuántos responden y cómo está la entregabilidad?"
+      />
       <PageBody>
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone="ok">Reuniones: dato real</Pill>
-          <Pill tone="warn">Prospección (outbound): Fase 1 — pendiente de envíos</Pill>
-          <span className="text-xs text-ink-muted">
-            Smartlead/HeyReach se poblarán cuando el warmup termine y las campañas empiecen a enviar.
-          </span>
-        </div>
+        {ultimoDato && (
+          <div className="flex flex-wrap items-center gap-2 text-[12px] text-ink-muted">
+            <Pill tone="ok">datos reales</Pill>
+            Smartlead (Email) y HeyReach (LinkedIn) · último registro de actividad: <strong className="text-ink">{ultimoDato}</strong>
+          </div>
+        )}
 
         {loading && <LoadingBlock label="Cargando prospección desde Supabase…" />}
         {error && <ErrorBlock message={error} />}

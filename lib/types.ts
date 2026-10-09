@@ -1,6 +1,9 @@
-// Tipos compartidos del dashboard (mock por ahora; el shape refleja el modelo real).
+// Tipos compartidos del dashboard (el shape refleja el modelo real de Supabase).
+import type { PipelineName } from "./pipeline";
 
-export type Column = { key: string; label: string; align?: "left" | "right"; type?: "dealLink"; hint?: string };
+// type: dealLink = cuenta clickeable a Pipedrive · pipeline = chip Analytics/Voice Agent ·
+//       si_no = chip verde/gris · money = moneda
+export type Column = { key: string; label: string; align?: "left" | "right"; type?: "dealLink" | "pipeline" | "si_no" | "money"; hint?: string };
 
 export type DrillPayload = {
   title: string;
@@ -48,6 +51,9 @@ export type DealRow = {
   fecha_cierre_est: string | null; // cierre estimado (abiertos)
   agendado_por_option_id: string | null; // quién trajo el lead (option_id ESTABLE) — filtro Origen
   canal_entrada: string | null; // canal de entrada del deal (LinkedIn/Email/WhatsApp/Llamada/Evento/Referido) | null
+  fecha_agendado?: string | null; // creación del deal (hora MX) — cohorte del embudo
+  updated_at?: string | null; // última corrida del Flujo 5 que tocó el deal
+  pipeline: PipelineName; // DERIVADO en el cliente de max_stage_id (Analytics | Voice Agent)
 };
 
 // Filas de las vistas de gráficas de Venta
@@ -60,7 +66,7 @@ export type ReunionRow = {
   cuenta: string | null;
   mes_reunion: string | null; // 'YYYY-MM-DD' (primer día del mes) o null
   fecha_reunion: string | null;
-  fecha_agendado: string | null; // 'YYYY-MM-DD' = stage_change_time truncado (aprox. de "agendado"; ver v_reuniones/T14)
+  fecha_agendado: string | null; // 'YYYY-MM-DD' = creación del deal (add_time, hora MX), clamp a fecha_reunion
   agendado_por: string | null; // label (etiqueta)
   agendado_por_option_id: string | null; // option_id ESTABLE — filtro de equipo REUNIONES
   ae: string | null;
@@ -75,6 +81,7 @@ export type ReunionRow = {
   horas_mes: number | null;
   chats_mes: number | null;
   discovery: string | null;
+  pipeline: PipelineName; // DERIVADO: join con fact_deals.max_stage_id por deal_id
 };
 
 export type MetaRow = {

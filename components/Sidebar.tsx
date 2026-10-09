@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Orden = el día a día de la operación: reuniones (lo que se paga) → pipeline → actividad → alertas.
 const NAV = [
-  { href: "/venta", label: "Venta / Pipeline", icon: "▤", desc: "MRR, logos, forecast" },
-  { href: "/reuniones", label: "Reuniones", icon: "◎", desc: "Calificadas, show rate", star: true },
-  { href: "/prospeccion", label: "Prospección", icon: "◇", desc: "Funnel, canales (Fase 1)" },
-  { href: "/insights", label: "Insights IA", icon: "✦", desc: "Análisis + chat" },
+  { href: "/reuniones", label: "Reuniones", icon: "◎", desc: "Calificadas vs meta, próximas", star: true },
+  { href: "/venta", label: "Venta / Pipeline", icon: "▤", desc: "Pipeline, ganados, atorados" },
+  { href: "/prospeccion", label: "Prospección", icon: "◇", desc: "LinkedIn, Email, entregabilidad" },
+  { href: "/insights", label: "Insights", icon: "✦", desc: "Qué atender hoy + chat IA" },
 ];
 
 export function Sidebar() {
@@ -57,7 +58,8 @@ export function Sidebar() {
           <span className="h-1.5 w-1.5 rounded-full bg-semaforo-green" />
           Mercado México · BDR Laura
         </div>
-        <div className="mt-1 text-slate-400">datos en vivo · Supabase</div>
+        <div className="mt-1 text-slate-400">Pipelines: Analytics + Voice Agent</div>
+        <div className="mt-0.5 text-slate-400">Pipedrive → Supabase cada 2 h</div>
       </div>
     </aside>
   );

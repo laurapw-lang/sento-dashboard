@@ -1,7 +1,7 @@
 "use client";
 
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import type { MotivoBar } from "@/lib/ventaGraficas";
+import type { MotivoBar } from "@/lib/venta";
 import { useDrilldown } from "../DrillDown";
 
 const COLORS = ["#E24B4A", "#EF9F27", "#7C5CFF", "#3FA9FF", "#29D3D3", "#2BD98C", "#9B8CFF"];

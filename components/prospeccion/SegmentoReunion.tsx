@@ -1,7 +1,7 @@
 "use client";
 
 // Prospección → reunión por segmento (vertical × carril), desde v_funnel_prospeccion.
-// Une la prospección (contactados/interesados — Fase 1, hoy 0) con las reuniones REALES
+// Une la prospección (contactados/interesados de Smartlead/HeyReach) con las reuniones REALES
 // (agendadas/calificadas de v_reuniones) por las mismas dimensiones. Atribución aproximada.
 
 import { EmptyBlock } from "@/components/DataState";
@@ -23,7 +23,7 @@ export function SegmentoReunion({ rows }: { rows: Row[] }) {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-ink">Recorrido por segmento</span>
         <Pill tone="ok">reuniones: dato real</Pill>
-        <Pill tone="warn">contactados/interesados: Fase 1</Pill>
+        <Pill tone="info">contactados/interesados: Smartlead + HeyReach</Pill>
       </div>
 
       <div className="overflow-x-auto">

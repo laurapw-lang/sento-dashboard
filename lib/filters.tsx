@@ -19,15 +19,18 @@ export type Filters = {
   carril: string; // "Todos"
   origen: string; // "Todos" — persona (setter), aplica a Reuniones/Venta
   canal: string; // "Todos" — LinkedIn/Email, aplica a Prospección
+  pipeline: string; // "Todos" | "Analytics" | "Voice Agent" — aplica a Reuniones/Venta
 };
 
+// Default = ESTE MES: la operación se mide y se paga por mes (metas mensuales).
 export const DEFAULT_FILTERS: Filters = {
-  periodo: { preset: "todo", from: null, to: null },
+  periodo: { preset: "este_mes", from: null, to: null },
   vertical: "Todas",
   ae: "Todos",
   carril: "Todos",
   origen: "Todos",
   canal: "Todos",
+  pipeline: "Todos",
 };
 
 // Resuelve un preset (o rango personalizado) a { from, to } en 'YYYY-MM-DD', o nulls = "todo".
@@ -90,17 +93,35 @@ export function matchCanal(c: string | null | undefined, filters: Filters): bool
   return filters.canal === "Todos" || c === filters.canal;
 }
 
-// Etiqueta legible del periodo activo (para el indicador de filtros).
+// ¿La fila pasa el filtro Pipeline? "Todos" = sin filtro. Pipeline derivado del stage_id.
+export function matchPipeline(p: string | null | undefined, filters: Filters): boolean {
+  return filters.pipeline === "Todos" || p === filters.pipeline;
+}
+
+const MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// Etiqueta legible del periodo activo, con el nombre REAL (ej. "octubre 2026"), para que
+// siempre quede claro qué meses se están viendo.
 export function periodoLabel(p: Periodo): string {
-  const map: Record<string, string> = {
-    todo: "Todo",
-    este_mes: "Este mes",
-    mes_pasado: "Mes pasado",
-    este_trimestre: "Este trimestre",
-    este_anio: "Este año",
-  };
-  if (p.preset === "personalizado") return `${p.from ?? "…"} → ${p.to ?? "…"}`;
-  return map[p.preset] ?? "Todo";
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (p.preset) {
+    case "este_mes":
+      return `${MESES_LARGO[m]} ${y}`;
+    case "mes_pasado": {
+      const d = new Date(y, m - 1, 1);
+      return `${MESES_LARGO[d.getMonth()]} ${d.getFullYear()}`;
+    }
+    case "este_trimestre":
+      return `T${Math.floor(m / 3) + 1} ${y}`;
+    case "este_anio":
+      return `año ${y}`;
+    case "personalizado":
+      return `${p.from ?? "…"} → ${p.to ?? "…"}`;
+    default:
+      return "todo el histórico";
+  }
 }
 
 type Ctx = {
@@ -125,12 +146,13 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
 
   const activeCount = useMemo(() => {
     let n = 0;
-    if (filters.periodo.preset !== "todo") n++;
+    if (filters.periodo.preset !== DEFAULT_FILTERS.periodo.preset) n++;
     if (filters.vertical !== "Todas") n++;
     if (filters.ae !== "Todos") n++;
     if (filters.carril !== "Todos") n++;
     if (filters.origen !== "Todos") n++;
     if (filters.canal !== "Todos") n++;
+    if (filters.pipeline !== "Todos") n++;
     return n;
   }, [filters]);
 

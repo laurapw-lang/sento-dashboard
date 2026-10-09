@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { PipelineBar } from "@/lib/ventaGraficas";
+import type { PipelineBar } from "@/lib/venta";
 import { useDrilldown } from "../DrillDown";
 
 const CAT_COLOR: Record<PipelineBar["cat"], string> = {

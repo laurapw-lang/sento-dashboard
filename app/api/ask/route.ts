@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { pipelineOf } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,11 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const RL_MAX = Number(process.env.ASK_RATE_LIMIT_MAX) || 15; // peticiones por ventana por IP
 const RL_WINDOW_MS = (Number(process.env.ASK_RATE_LIMIT_WINDOW_MIN) || 60) * 60 * 1000; // default 60 min
 
-const SYSTEM = `Eres el analista de datos del dashboard de prospección y ventas de Sento en el mercado México. Asesoras a Laura (BDR Senior).
+const system = () => `Eres el analista de datos del dashboard de prospección y ventas de Sento en el mercado México. Asesoras a Laura (BDR Senior).
 
 Conoces las métricas del negocio:
-- REUNIONES: la métrica principal (de pagos) es "reuniones calificadas agendadas". En v_reuniones: es_agendada = llegó a Demo Agendada o más; es_calificada = agendada Y cumple la regla de calificación. El equipo de reuniones se identifica por agendado_por_option_id: 249=Andrés Sanjuán, 274=Laura Peña, 275=Zalesmachine, 278=Edgardo Velasquez, 279=Michelle Sosa. Las metas mensuales están en metas_reuniones (por entidad y periodo).
+- REUNIONES: la métrica principal (de comisiones) es "reuniones calificadas REALIZADAS" (es_calificada_realizada = la reunión ocurrió —Demo Realizada o más— Y cumple la regla: graban llamadas = sí y no perdida por volumen insuficiente), contada por fecha_reunion. es_agendada = llegó a Demo Agendada o más (se cuenta por fecha_agendado). es_calificada_realizada = null significa que falta un dato en Pipedrive (no es descarte).
+- PIPELINES: hay DOS pipelines de venta en Pipedrive: "Analytics" y "Voice Agent". Cada reunión y deal trae el campo pipeline. Cuando des cifras, especifica de qué pipeline son (o que son ambos). El equipo de reuniones se identifica por agendado_por_option_id: 249=Andrés Sanjuán, 274=Laura Peña, 275=Zalesmachine, 278=Edgardo Velasquez, 279=Michelle Sosa. Las metas mensuales están en metas_reuniones (por entidad y periodo; son totales, no por pipeline). Hoy es ${new Date().toISOString().slice(0, 10)}.
 - EMBUDO (embudo_journey): recorrido acumulativo por etapa MÁXIMA alcanzada (incluye deals perdidos por hasta dónde llegaron, no como "Perdido"). "alcanzaron" = cuántos deals llegaron a esa etapa o más.
 - PIPELINE: pipeline_objetivo (≈186,000 = MRR anual 37,200 / win_rate supuesto 0.20), pipeline_actual y brecha. pipeline_actual = estado actual por etapa. El equipo AE de venta es Andrés Sanjuán, Edgardo Velasquez, Michelle Sosa.
 - MOTIVOS: por qué se pierden los deals (motivos_perdida).
@@ -90,9 +92,15 @@ export async function POST(req: Request) {
     fetchView("metas", "operacion=ilike.*xico*&tipo_meta=eq.reuniones&select=entidad,periodo,meta_valor&order=entidad,periodo"),
     fetchView(
       "v_reuniones",
-      "select=cuenta,agendado_por_option_id,agendado_por,ae,etapa,mes_reunion,es_agendada,es_realizada,es_calificada,es_calificada_realizada"
+      "select=deal_id,cuenta,agendado_por_option_id,agendado_por,ae,etapa,fecha_agendado,fecha_reunion,es_agendada,es_realizada,es_calificada,es_calificada_realizada,graban_llamadas"
     ),
   ]);
+  // Pipeline de cada deal (Analytics | Voice Agent), derivado de su stage_id.
+  const stages = await fetchView("fact_deals", "select=deal_id,max_stage_id&operacion=ilike.*xico*");
+  const stageById = new Map(Array.isArray(stages) ? stages.map((d: any) => [String(d.deal_id), d.max_stage_id]) : []);
+  const reunionesConPipeline = Array.isArray(reuniones)
+    ? reuniones.map((r: any) => ({ ...r, pipeline: pipelineOf(stageById.get(String(r.deal_id))) }))
+    : reuniones;
 
   const contexto = {
     equipo_reuniones_option_id: { "249": "Andrés Sanjuán", "274": "Laura Peña", "275": "Zalesmachine", "278": "Edgardo Velasquez", "279": "Michelle Sosa" },
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
     pipeline_objetivo: pipelineObjetivo,
     motivos_perdida: motivos,
     metas_reuniones: metasReuniones,
-    reuniones: reuniones,
+    reuniones: reunionesConPipeline,
   };
 
   try {
@@ -110,7 +118,7 @@ export async function POST(req: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
-      system: SYSTEM,
+      system: system(),
       messages: [
         {
           role: "user",
