@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 // Orden = el día a día de la operación: reuniones (lo que se paga) → pipeline → actividad → alertas.
 const NAV = [
+  { href: "/", label: "Command Center", icon: "◈", desc: "Resumen de ambas gestiones" },
   { href: "/reuniones", label: "Reuniones", icon: "◎", desc: "Calificadas vs meta, próximas", star: true },
   { href: "/venta", label: "Venta / Pipeline", icon: "▤", desc: "Pipeline, ganados, atorados" },
   { href: "/prospeccion", label: "Prospección", icon: "◇", desc: "LinkedIn, Email, entregabilidad" },
@@ -28,7 +29,7 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 px-3 pt-2">
         {NAV.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}

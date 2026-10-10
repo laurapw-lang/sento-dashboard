@@ -1,27 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState } from "react";
+import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Topbar } from "@/components/Topbar";
 import { PageBody } from "@/components/PageBody";
 import { DataTable } from "@/components/DataTable";
 import { LoadingBlock, ErrorBlock, EmptyBlock } from "@/components/DataState";
-import { Card, Callout, DrillButton, Flow, HeroStat, ProgressBar, fmtPct } from "@/components/ui";
+import { Card, Callout, DrillButton } from "@/components/ui";
+import { AgendaStrip, BulletRows, DonutPick, FunnelViz, RadialGauge } from "@/components/viz";
 import { useDrilldown } from "@/components/DrillDown";
 import { useAsync } from "@/lib/useAsync";
 import { useFilters } from "@/lib/filters";
 import { fetchReunionesRaw, buildReuniones, type ReunionesData } from "@/lib/reuniones";
-import { PIPELINES } from "@/lib/pipeline";
+import { PIPELINES, VERT_COLORS } from "@/lib/pipeline";
 import { getSemaforo } from "@/lib/semaforo";
 
 export default function ReunionesPage() {
@@ -31,10 +22,7 @@ export default function ReunionesPage() {
 
   return (
     <>
-      <Topbar
-        title="Reuniones"
-        subtitle="¿Cuántas reuniones calificadas hicimos, cuánto falta para la meta y qué hay que atender?"
-      />
+      <Topbar title="Reuniones" subtitle="Generación de reuniones (setters): cuántas calificadas llevamos, quién va bien y qué viene." />
       <PageBody>
         {loading && <LoadingBlock label="Cargando reuniones desde Supabase…" />}
         {error && <ErrorBlock message={error} />}
@@ -45,158 +33,191 @@ export default function ReunionesPage() {
 }
 
 function Contenido({ d }: { d: ReunionesData }) {
-  const { filters } = useFilters();
+  const { open } = useDrilldown();
+  const { filters, set, setPeriodo } = useFilters();
+  const [vistaAgenda, setVistaAgenda] = useState<"calendario" | "lista">("calendario");
+  const toggle = (key: "pipeline" | "vertical" | "origen", v: string, todos: string) =>
+    set({ [key]: filters[key] === v ? todos : v } as any);
+  const faltan = d.calif.meta != null ? Math.max(0, d.calif.meta - d.calif.valor) : null;
+  const esperado = d.ritmo != null && d.calif.meta != null ? Math.round(d.calif.meta * d.ritmo) : null;
+
   return (
     <>
-      {/* 1 · La métrica que se paga */}
-      <HeroStat
-        eyebrow={`Calificadas realizadas · ${d.periodo}`}
-        value={d.calif.valor}
-        meta={d.calif.meta}
-        drill={d.calif.drill}
-        explicacion={
-          <>
-            Reuniones que <strong className="text-ink">sí ocurrieron</strong> en el periodo y{" "}
-            <strong className="text-ink">califican</strong> (graban llamadas y con volumen). Es la métrica de comisiones.
-            {d.calif.meta != null && <> Meta: {d.metaAmbito}.</>}
-            {!d.metaAplica && <> La meta no se compara al ver un solo pipeline (las metas son totales).</>}
-          </>
-        }
-        extra={filters.periodo.preset === "este_mes" && d.calif.meta != null ? <Ritmo valor={d.calif.valor} meta={d.calif.meta} /> : undefined}
-      />
+      {/* ───────── 1 · Meta + embudo ───────── */}
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.25fr]">
+        <Card title={`Calificadas realizadas · ${d.periodo}`} subtitle="La métrica de comisiones: la reunión ocurrió y califica (graban llamadas y con volumen).">
+          <div className="flex flex-col items-center gap-5 sm:flex-row">
+            <RadialGauge value={d.calif.valor} meta={d.calif.meta} ritmo={d.ritmo} size={190} onClick={() => open(d.calif.drill)} />
+            <div className="w-full space-y-3">
+              <Dato
+                titulo={faltan == null ? "Sin meta comparable" : faltan === 0 ? "¡Meta cumplida!" : `Faltan ${faltan}`}
+                texto={
+                  d.calif.meta == null
+                    ? d.metaAplica
+                      ? "Esta persona no tiene meta cargada."
+                      : "Las metas son totales: no se comparan al ver un solo pipeline."
+                    : `${d.metaAmbito} = ${d.calif.meta}`
+                }
+                tono={faltan === 0 ? "ok" : "neutral"}
+              />
+              {esperado != null && (
+                <Dato
+                  titulo={d.calif.valor >= esperado ? `En ritmo (+${d.calif.valor - esperado})` : `${esperado - d.calif.valor} abajo del ritmo`}
+                  texto={`Al día ${new Date().getDate()}, el ritmo de la meta pide ~${esperado}. La rayita negra del anillo marca ese punto.`}
+                  tono={d.calif.valor >= esperado ? "ok" : "bad"}
+                />
+              )}
+              <Dato
+                titulo={`${d.tasaCalif == null ? "—" : Math.round(d.tasaCalif * 100) + "%"} de las realizadas califican`}
+                texto="Si baja, revisa el filtro de calificación antes de agendar (¿graban llamadas? ¿volumen?)."
+                tono="neutral"
+              />
+            </div>
+          </div>
+        </Card>
 
-      {/* Avisos accionables */}
+        <Card title="Del agendado a la calificada" subtitle="Clic en cada barra para ver las cuentas.">
+          <FunnelViz
+            convLabels={["asisten", "califican"]}
+            steps={[
+              { label: "Agendadas", value: d.agendadas.valor, color: "#3FA9FF", drill: d.agendadas.drill, hint: "Por fecha en que se agendó" },
+              { label: "Realizadas", value: d.realizadas.valor, color: "#29B6C9", drill: d.realizadas.drill, hint: "Por fecha de la reunión" },
+              { label: "Calificadas", value: d.calif.valor, color: "#1D9E75", drill: d.calif.drill, hint: "Lo que se paga" },
+            ]}
+          />
+          <p className="mt-3 text-[11px] text-ink-muted">
+            Agendadas cuentan por fecha de agendado y realizadas por fecha de reunión: la conversión es del periodo, no de las mismas cuentas.
+            {d.calif.metaAgendadas ? ` Meta de agendadas: ${d.calif.metaAgendadas}.` : ""}
+          </p>
+        </Card>
+      </section>
+
       {d.porRevisar.rows.length > 0 && (
         <Callout
           tone="warn"
-          title={`${d.porRevisar.rows.length} reunión(es) realizada(s) no se pueden evaluar: falta un dato en Pipedrive`}
+          title={`${d.porRevisar.rows.length} reunión(es) realizada(s) no cuentan todavía: falta un dato en Pipedrive`}
           action={<DrillButton drill={d.porRevisar} label="Ver cuáles" />}
         >
-          Mientras falte el dato no cuentan como calificadas. Captúralo en Pipedrive y se actualizan en la siguiente
-          sincronización (cada hora).
+          Captura “Graban llamadas” (o el motivo de pérdida) y se actualiza en la siguiente sincronización (cada hora).
         </Callout>
       )}
 
-      {/* 2 · Del agendado a la calificada */}
-      <section className="space-y-3">
-        <Encabezado titulo="Del agendado a la calificada" detalle="Clic en cualquier número para ver las cuentas." />
-        <Flow
-          steps={[
-            {
-              label: "Agendadas",
-              value: d.agendadas.valor,
-              hint: d.calif.metaAgendadas
-                ? `Meta de agendadas: ${d.calif.metaAgendadas}. Cuenta por fecha en que se agendó.`
-                : "Cuenta por la fecha en que se agendó (creación del deal).",
-              drill: d.agendadas.drill,
-              color: "#3FA9FF",
-            },
-            {
-              label: "Realizadas",
-              value: d.realizadas.valor,
-              hint: "La reunión ocurrió (llegó a Demo Realizada o más). Cuenta por fecha de reunión.",
-              drill: d.realizadas.drill,
-              color: "#29D3D3",
-              conv: { label: "asistencia", value: d.showRate },
-            },
-            {
-              label: "Calificadas",
-              value: d.calif.valor,
-              hint: "Realizadas que cumplen la regla. Esta es la que se paga.",
-              drill: d.calif.drill,
-              color: "#1D9E75",
-              conv: { label: "califican", value: d.tasaCalif },
-            },
-          ]}
-        />
-        <p className="text-[11px] text-ink-muted">
-          Ojo: agendadas y realizadas usan fechas distintas, así que la asistencia es una referencia del periodo, no
-          de las mismas cuentas.
-        </p>
+      {/* ───────── 2 · Equipo + mezclas ───────── */}
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card title="Equipo vs meta" subtitle="Barra = calificadas · rayita = meta. Clic en el nombre para filtrar todo por esa persona.">
+          <BulletRows
+            rows={d.equipo.map((p) => ({
+              label: p.nombre,
+              value: p.calif,
+              meta: p.meta,
+              secundario: `${p.realizadas} real. · ${p.agendadas} ag.`,
+              drill: p.drill,
+              activo: filters.origen === p.nombre,
+              onPick: () => toggle("origen", p.nombre, "Todos"),
+            }))}
+          />
+        </Card>
+
+        <Card title="Por pipeline" subtitle="Calificadas realizadas. Clic en un segmento para ver solo ese pipeline.">
+          <DonutPick
+            centerLabel="calificadas"
+            selected={filters.pipeline}
+            onPick={(n) => toggle("pipeline", n, "Todos")}
+            data={d.porPipeline.map((p) => ({ name: p.nombre, value: p.calif, color: p.color }))}
+          />
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center text-[11px] text-ink-muted">
+            {d.porPipeline.map((p) => (
+              <button key={p.nombre} type="button" onClick={() => open(p.drill)} className="rounded-lg bg-canvas px-2 py-1.5 hover:text-[#2478C7]">
+                <strong className="text-ink">{p.realizadas}</strong> realizadas · <strong className="text-ink">{p.agendadas}</strong> agendadas
+                <span className="block font-semibold" style={{ color: p.color }}>{p.nombre} ↗</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="Por vertical" subtitle="Calificadas realizadas. Clic para filtrar por vertical.">
+          <DonutPick
+            centerLabel="calificadas"
+            selected={filters.vertical}
+            onPick={(n) => toggle("vertical", n, "Todas")}
+            data={d.porVertical.map((v) => ({ name: v.nombre, value: v.calif, color: VERT_COLORS[v.nombre] ?? "#C6CEDA" }))}
+          />
+        </Card>
       </section>
 
-      {/* 3 · Por pipeline */}
-      <section className="space-y-3">
-        <Encabezado
-          titulo="Por pipeline"
-          detalle="Analytics y Voice Agent son pipelines separados en Pipedrive. Usa el selector de arriba para ver solo uno."
-        />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {d.porPipeline.map((p) => {
-            const atenuado = filters.pipeline !== "Todos" && filters.pipeline !== p.nombre;
-            return (
-              <Card
-                key={p.nombre}
-                className={atenuado ? "opacity-50" : ""}
-                title={
-                  <span className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />
-                    {p.nombre}
-                  </span>
-                }
-                action={p.realizadas > 0 ? <DrillButton drill={p.drill} label="Cuentas" /> : undefined}
+      {/* ───────── 3 · Agenda ───────── */}
+      <Card
+        title={`Próximas reuniones (${d.agenda.length})`}
+        subtitle="Las próximas 2 semanas. Antes de cada reunión, confirma que tenga “Graban llamadas” capturado."
+        action={
+          <div className="flex rounded-lg border border-line p-0.5 text-[11px] font-semibold">
+            {(["calendario", "lista"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVistaAgenda(v)}
+                className={`rounded-md px-2.5 py-1 capitalize ${vistaAgenda === v ? "bg-ink text-white" : "text-ink-muted hover:text-ink"}`}
               >
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <MiniStat label="Agendadas" value={p.agendadas} />
-                  <MiniStat label="Realizadas" value={p.realizadas} />
-                  <MiniStat label="Calificadas" value={p.calif} strong color={p.color} />
+                {v}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        {d.agenda.length === 0 ? (
+          <EmptyBlock label="No hay reuniones con fecha futura en Pipedrive" />
+        ) : vistaAgenda === "calendario" ? (
+          <AgendaStrip items={d.agenda} />
+        ) : (
+          <DataTable columns={d.proximas.columns} rows={d.proximas.rows} />
+        )}
+      </Card>
+
+      {/* ───────── 4 · Tendencia ───────── */}
+      <Card title="Últimos 6 meses" subtitle="Calificadas realizadas por mes y pipeline vs meta. Clic en un mes para ver ese mes en todo el dashboard.">
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={d.tendencia}
+              margin={{ top: 8, right: 12, bottom: 0, left: -18 }}
+              onClick={(e: any) => {
+                const row = e?.activePayload?.[0]?.payload;
+                if (!row?.key) return;
+                const [y, m] = String(row.key).split("-").map(Number);
+                const last = new Date(y, m, 0).getDate();
+                setPeriodo({ preset: "personalizado", from: `${row.key}-01`, to: `${row.key}-${String(last).padStart(2, "0")}` });
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              <CartesianGrid stroke="#EDF1F7" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#5E6B82" }} axisLine={{ stroke: "#EDF1F7" }} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#5E6B82" }} axisLine={false} tickLine={false} allowDecimals={false} width={40} />
+              <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E5E9F0", borderRadius: 10, fontSize: 12 }} cursor={{ fill: "rgba(63,169,255,0.08)" }} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "#5E6B82", paddingTop: 6 }} iconType="circle" />
+              {PIPELINES.map((p, i) => (
+                <Bar key={p.nombre} dataKey={p.nombre} stackId="c" fill={p.color} maxBarSize={52} radius={i === PIPELINES.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]} />
+              ))}
+              <Line type="monotone" dataKey="meta" name="Meta" stroke="#1A2130" strokeDasharray="5 4" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {d.tendencia.map((m) => {
+            const tot = m.Analytics + m["Voice Agent"];
+            const sem = m.meta ? getSemaforo(Math.round((tot / m.meta) * 100)) : null;
+            return (
+              <div key={m.key} className="rounded-lg bg-canvas px-2 py-1.5 text-center">
+                <div className="text-[10px] font-semibold uppercase text-ink-muted">{m.mes}</div>
+                <div className="text-sm font-bold tabular-nums text-ink">
+                  {tot}
+                  {m.meta ? <span className="font-normal text-ink-muted">/{m.meta}</span> : null}
                 </div>
-              </Card>
+                {sem && m.meta ? <div className="text-[10px] font-bold" style={{ color: sem.color }}>{Math.round((tot / m.meta) * 100)}%</div> : null}
+              </div>
             );
           })}
         </div>
-      </section>
-
-      {/* 4 · Equipo */}
-      <section className="space-y-3">
-        <Encabezado titulo="Equipo — avance contra la meta" detalle="Quién agendó (setter). Clic en una persona para ver sus calificadas." />
-        <Equipo d={d} />
-      </section>
-
-      {/* 5 · Próximas */}
-      <section className="space-y-3">
-        <Encabezado
-          titulo={`Próximas reuniones (${d.proximas.rows.length})`}
-          detalle="Desde hoy, la más cercana primero. Revisa que tengan “Graban llamadas” capturado antes de la reunión."
-        />
-        {d.proximas.rows.length ? (
-          <DataTable columns={d.proximas.columns} rows={d.proximas.rows} />
-        ) : (
-          <EmptyBlock label="No hay reuniones con fecha futura en Pipedrive" />
-        )}
-      </section>
-
-      {/* 6 · Tendencia */}
-      <section className="space-y-3">
-        <Encabezado titulo="Últimos 6 meses" detalle="Calificadas realizadas por mes, separadas por pipeline, contra la meta." />
-        <Card>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={d.tendencia} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
-                <CartesianGrid stroke="#EDF1F7" vertical={false} />
-                <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#5E6B82" }} axisLine={{ stroke: "#EDF1F7" }} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "#5E6B82" }} axisLine={false} tickLine={false} allowDecimals={false} width={40} />
-                <Tooltip
-                  contentStyle={{ background: "#fff", border: "1px solid #E5E9F0", borderRadius: 10, fontSize: 12 }}
-                  cursor={{ fill: "rgba(63,169,255,0.06)" }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11, color: "#5E6B82", paddingTop: 6 }} iconType="circle" />
-                {PIPELINES.map((p, i) => (
-                  <Bar
-                    key={p.nombre}
-                    dataKey={p.nombre}
-                    stackId="c"
-                    fill={p.color}
-                    maxBarSize={48}
-                    radius={i === PIPELINES.length - 1 ? [5, 5, 0, 0] : [0, 0, 0, 0]}
-                  />
-                ))}
-                <Line type="monotone" dataKey="meta" name="Meta" stroke="#1A2130" strokeDasharray="5 4" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </section>
+      </Card>
 
       {d.isEmpty && (
         <Callout tone="info" title="Sin reuniones en este periodo con estos filtros">
@@ -207,100 +228,12 @@ function Contenido({ d }: { d: ReunionesData }) {
   );
 }
 
-/** Ritmo del mes en curso: lo esperado a hoy si se avanzara parejo hacia la meta. */
-function Ritmo({ valor, meta }: { valor: number; meta: number }) {
-  const hoy = new Date();
-  const dias = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-  const esperado = Math.round((meta * hoy.getDate()) / dias);
-  const diff = valor - esperado;
+function Dato({ titulo, texto, tono }: { titulo: string; texto: string; tono: "ok" | "bad" | "neutral" }) {
+  const color = tono === "ok" ? "#158060" : tono === "bad" ? "#C23B3A" : "#1A2130";
   return (
-    <p className="text-[12px] text-ink-muted">
-      Día <strong className="text-ink">{hoy.getDate()}</strong> de {dias}. Al ritmo de la meta, hoy deberían ir ~
-      <strong className="text-ink">{esperado}</strong> →{" "}
-      {diff >= 0 ? (
-        <strong className="text-[#158060]">en ritmo (+{diff})</strong>
-      ) : (
-        <strong className="text-[#C23B3A]">{-diff} por debajo del ritmo</strong>
-      )}
-      .
-    </p>
-  );
-}
-
-function Encabezado({ titulo, detalle }: { titulo: string; detalle?: string }) {
-  return (
-    <div>
-      <h2 className="text-base font-semibold text-ink">{titulo}</h2>
-      {detalle && <p className="text-[12px] text-ink-muted">{detalle}</p>}
-    </div>
-  );
-}
-
-function MiniStat({ label, value, strong, color }: { label: string; value: number; strong?: boolean; color?: string }) {
-  return (
-    <div className="rounded-xl bg-canvas px-2 py-3">
-      <div className={`tabular-nums ${strong ? "text-3xl font-bold" : "text-2xl font-semibold"}`} style={{ color: strong ? color : undefined }}>
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11px] font-medium text-ink-muted">{label}</div>
-    </div>
-  );
-}
-
-function Equipo({ d }: { d: ReunionesData }) {
-  const { open } = useDrilldown();
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-card">
-      <div className="hidden grid-cols-[1.4fr_0.7fr_0.7fr_2fr] gap-4 border-b border-line bg-canvas px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted md:grid">
-        <span>Persona</span>
-        <span className="text-right">Agendadas</span>
-        <span className="text-right">Realizadas</span>
-        <span>Calificadas vs meta</span>
-      </div>
-      {d.equipo.map((p) => {
-        const pct = p.meta ? Math.round((p.calif / p.meta) * 100) : null;
-        const sem = pct != null ? getSemaforo(pct) : null;
-        return (
-          <button
-            key={p.nombre}
-            type="button"
-            onClick={() => open(p.drill)}
-            className="grid w-full grid-cols-2 gap-x-4 gap-y-2 border-b border-line/60 px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-canvas md:grid-cols-[1.4fr_0.7fr_0.7fr_2fr] md:items-center"
-          >
-            <span className="col-span-2 font-semibold text-ink md:col-span-1">{p.nombre}</span>
-            <span className="text-sm tabular-nums text-ink-muted md:text-right">
-              <span className="md:hidden">Agendadas: </span>
-              {p.agendadas}
-            </span>
-            <span className="text-sm tabular-nums text-ink-muted md:text-right">
-              <span className="md:hidden">Realizadas: </span>
-              {p.realizadas}
-            </span>
-            <span className="col-span-2 flex items-center gap-3 md:col-span-1">
-              <span className="w-16 shrink-0 text-sm tabular-nums">
-                <strong className="text-lg text-ink">{p.calif}</strong>
-                {p.meta != null && <span className="text-ink-muted"> / {p.meta}</span>}
-              </span>
-              {p.meta != null ? (
-                <>
-                  <span className="flex-1">
-                    <ProgressBar value={p.calif} meta={p.meta} />
-                  </span>
-                  <span className="w-12 text-right text-[12px] font-bold tabular-nums" style={{ color: sem?.color }}>
-                    {pct}%
-                  </span>
-                </>
-              ) : (
-                <span className="text-[12px] text-ink-muted">sin meta {d.metaAplica ? "definida" : "(filtro de pipeline)"}</span>
-              )}
-            </span>
-          </button>
-        );
-      })}
-      {d.equipo.length === 0 && <div className="px-5 py-6 text-center text-sm text-ink-muted">Sin personas para este filtro</div>}
-      <div className="border-t border-line bg-canvas px-5 py-2 text-[11px] text-ink-muted">
-        Calificación: {fmtPct(d.tasaCalif)} de las realizadas del periodo califican.
-      </div>
+    <div className="rounded-xl bg-canvas px-3 py-2.5">
+      <div className="text-[15px] font-bold" style={{ color }}>{titulo}</div>
+      <div className="text-[12px] leading-snug text-ink-muted">{texto}</div>
     </div>
   );
 }

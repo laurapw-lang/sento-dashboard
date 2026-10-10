@@ -12,6 +12,7 @@ import { fetchDeals, fetchMetas, fetchPipelineObjetivo } from "./db";
 import { isAeVenta, aeLabel, matchOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, matchPipeline, periodoLabel, type Filters } from "./filters";
 import { PIPELINES, stageRank, type PipelineName } from "./pipeline";
+import type { BoardCard } from "@/components/viz";
 
 export const STAGE_ORDER = [
   "Lead Asignado",
@@ -92,6 +93,9 @@ export type VentaData = {
   porCanal: { canal: string; activo: number; ganado: number; perdido: number }[];
   canalDrill: DrillPayload;
   atencion: DrillPayload;
+  board: BoardCard[]; // pipeline abierto, una tarjeta por deal (tablero kanban)
+  porVertical: { nombre: string; mrr: number; deals: number }[];
+  aeEtapa: Record<string, string | number>[]; // deals abiertos por AE apilados por etapa
 };
 
 export function buildVenta(deals: DealRow[], metas: MetaRow[], pipe: PipelineObjetivoRow | null, filters: Filters): VentaData {
@@ -141,9 +145,13 @@ export function buildVenta(deals: DealRow[], metas: MetaRow[], pipe: PipelineObj
 
   const motivosMap = new Map<string, DealRow[]>();
   for (const d of perdidos) motivosMap.set(motivoOf(d), [...(motivosMap.get(motivoOf(d)) ?? []), d]);
-  const motivos: MotivoBar[] = Array.from(motivosMap.entries())
-    .map(([motivo, rows]) => ({ motivo, deals: rows.length, drill: dealsDrill(`Perdidos: ${motivo}`, rows) }))
-    .sort((a, b) => b.deals - a.deals);
+  // Top 6 motivos + "Otros" (hay motivos en texto libre que fragmentan la gráfica).
+  const ordenados = Array.from(motivosMap.entries()).sort((a, b) => b[1].length - a[1].length);
+  const otros = ordenados.slice(6).flatMap(([, rows]) => rows);
+  const motivos: MotivoBar[] = [
+    ...ordenados.slice(0, 6).map(([motivo, rows]) => ({ motivo, deals: rows.length, drill: dealsDrill(`Perdidos: ${motivo}`, rows) })),
+    ...(otros.length ? [{ motivo: `Otros (${ordenados.length - 6} motivos)`, deals: otros.length, drill: dealsDrill("Perdidos: otros motivos", otros) }] : []),
+  ];
 
   const aeMap = new Map<string, DealRow[]>();
   for (const d of open) {
@@ -192,8 +200,33 @@ export function buildVenta(deals: DealRow[], metas: MetaRow[], pipe: PipelineObj
     })),
   };
 
+  const board: BoardCard[] = open.map((d) => ({
+    deal_id: d.deal_id,
+    cuenta: d.cuenta,
+    etapa: d.etapa ?? "Lead Asignado",
+    pipeline: d.pipeline,
+    mrr: n(d.mrr),
+    ae: aeLabel(d.owner_id, d.ae),
+    sinActividad: n(d.dias_sin_actividad),
+    enEtapa: n(d.dias_en_etapa),
+    siguiente: d.siguiente_paso,
+  }));
+  const VERTS = ["Banca/Fintech", "Retail", "Salud", "Seguros", "BPO", "Sin definir"];
+  const porVertical = VERTS.map((v) => {
+    const t = open.filter((d) => (d.vertical ?? "Sin definir") === v);
+    return { nombre: v, mrr: sumMrr(t), deals: t.length };
+  });
+  const aeEtapa = Array.from(new Set(open.map((d) => aeLabel(d.owner_id, d.ae)))).map((ae) => {
+    const row: Record<string, string | number> = { ae };
+    for (const e of STAGE_ORDER) row[e] = open.filter((d) => aeLabel(d.owner_id, d.ae) === ae && d.etapa === e).length;
+    return row;
+  });
+
   return {
     periodo: periodoLabel(filters.periodo),
+    board,
+    porVertical,
+    aeEtapa,
     isEmpty: seg.length === 0,
     abierto: {
       deals: open.length,

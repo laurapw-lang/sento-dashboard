@@ -38,3 +38,13 @@ export function pipelineMeta(nombre: string | null | undefined) {
 }
 
 export const PIPELINE_OPTIONS = ["Todos", ...PIPELINES.map((p) => p.nombre)];
+
+// Colores fijos por vertical (mismos en todas las gráficas).
+export const VERT_COLORS: Record<string, string> = {
+  "Banca/Fintech": "#3FA9FF",
+  Retail: "#29D3D3",
+  Salud: "#2BD98C",
+  Seguros: "#7C5CFF",
+  BPO: "#EF9F27",
+  "Sin definir": "#C6CEDA",
+};

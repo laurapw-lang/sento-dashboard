@@ -12,6 +12,7 @@ import { fetchReuniones, fetchMetas } from "./db";
 import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM, matchOrigen, metaEntidadForOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, matchPipeline, periodoLabel, type Filters } from "./filters";
 import { PIPELINES, type PipelineName } from "./pipeline";
+import type { AgendaItem } from "@/components/viz";
 
 const MESES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const fmtFecha = (v: string | null): string => (v ? String(v).slice(0, 10) : "—");
@@ -76,6 +77,9 @@ export type ReunionesData = {
   proximas: DrillPayload;
   porRevisar: DrillPayload; // realizadas sin el dato de calificación en Pipedrive
   tendencia: MesFila[];
+  porVertical: { nombre: string; realizadas: number; calif: number }[];
+  agenda: AgendaItem[];
+  ritmo: number | null; // fracción del mes transcurrida (solo "este mes")
   isEmpty: boolean;
 };
 
@@ -214,8 +218,33 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     };
   });
 
+  // ---- Por vertical (realizadas y calificadas del periodo) ----
+  const VERTS = ["Banca/Fintech", "Retail", "Salud", "Seguros", "BPO", "Sin definir"];
+  const porVertical = VERTS.map((v) => ({
+    nombre: v,
+    realizadas: realizadas.filter((r) => (r.vertical ?? "Sin definir") === v).length,
+    calif: califReal.filter((r) => (r.vertical ?? "Sin definir") === v).length,
+  }));
+
+  const agenda: AgendaItem[] = proxRows.map((r) => ({
+    fecha: fmtFecha(r.fecha_reunion),
+    cuenta: r.cuenta,
+    deal_id: r.deal_id,
+    pipeline: r.pipeline,
+    graba: siNo(r.graban_llamadas),
+    setter: reunionesLabel(r.agendado_por_option_id, r.agendado_por),
+    ae: r.ae,
+  }));
+  const ritmo =
+    filters.periodo.preset === "este_mes"
+      ? hd.getDate() / new Date(hd.getFullYear(), hd.getMonth() + 1, 0).getDate()
+      : null;
+
   return {
     periodo: periodoLabel(filters.periodo),
+    porVertical,
+    agenda,
+    ritmo,
     metaAplica,
     metaAmbito,
     calif: {
