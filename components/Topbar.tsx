@@ -28,12 +28,12 @@ const SIMPLE: { key: "vertical" | "ae" | "carril" | "origen" | "canal"; label: s
   { key: "canal", label: "Canal", options: ["Todos", "LinkedIn", "Email"] }, // Prospección
 ];
 
-/** "hace 35 min" / "hace 3 h" / "hace 2 días" + si está atrasado (Flujo 5 corre cada 2 h, 7–21 h MX). */
+/** "hace 35 min" / "hace 3 h" / "hace 2 días" + si está atrasado (Flujo 5 corre cada hora, 7–22 h MX). */
 function frescura(iso: string | null | undefined): { texto: string; atrasado: boolean } | null {
   if (!iso) return null;
   const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   const texto = min < 60 ? `hace ${min} min` : min < 60 * 24 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} días`;
-  // Atrasado = más de 14 h sin sync (cubre la pausa nocturna 21→7 h).
+  // Atrasado = más de 14 h sin sync (cubre la pausa nocturna 22→7 h).
   return { texto, atrasado: min > 14 * 60 };
 }
 
@@ -106,7 +106,7 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
           </div>
           {fresh && (
             <span
-              title="Última sincronización Pipedrive → Supabase (Flujo 5 corre cada 2 h, 7–21 h MX)"
+              title="Última sincronización Pipedrive → Supabase (Flujo 5 corre cada hora, 7–22 h MX)"
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                 fresh.atrasado
                   ? "border-semaforo-amber/40 bg-semaforo-amber/15 text-[#B9770F]"

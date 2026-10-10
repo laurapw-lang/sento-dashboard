@@ -59,7 +59,7 @@ export function Sidebar() {
           Mercado México · BDR Laura
         </div>
         <div className="mt-1 text-slate-400">Pipelines: Analytics + Voice Agent</div>
-        <div className="mt-0.5 text-slate-400">Pipedrive → Supabase cada 2 h</div>
+        <div className="mt-0.5 text-slate-400">Pipedrive → Supabase cada hora</div>
       </div>
     </aside>
   );

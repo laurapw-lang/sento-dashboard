@@ -73,7 +73,7 @@ function Contenido({ d }: { d: ReunionesData }) {
           action={<DrillButton drill={d.porRevisar} label="Ver cuáles" />}
         >
           Mientras falte el dato no cuentan como calificadas. Captúralo en Pipedrive y se actualizan en la siguiente
-          sincronización (cada 2 h).
+          sincronización (cada hora).
         </Callout>
       )}
 
