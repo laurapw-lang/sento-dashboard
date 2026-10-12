@@ -34,6 +34,7 @@ function reunionesDrill(title: string, rows: ReunionRow[], subtitle?: string): D
       { key: "ae", label: "AE" },
       { key: "calificada", label: "Califica", type: "si_no", hint: HINT_CALIF },
       { key: "etapa", label: "Etapa hoy" },
+      { key: "nota", label: "Nota" },
     ],
     rows: [...rows]
       .sort((a, b) => String(b.fecha_reunion ?? "").localeCompare(String(a.fecha_reunion ?? "")))
@@ -47,6 +48,12 @@ function reunionesDrill(title: string, rows: ReunionRow[], subtitle?: string): D
         ae: r.ae,
         calificada: r.es_realizada ? siNo(r.es_calificada_realizada) : siNo(r.es_calificada),
         etapa: r.etapa,
+        nota:
+          r.realizada_por === "fecha"
+            ? "⚠ ya pasó la reunión: mover a Demo Realizada"
+            : r.realizada_por === "motivo"
+            ? "perdida después de la reunión"
+            : "",
       })),
   };
 }
@@ -80,6 +87,7 @@ export type ReunionesData = {
   equipo: PersonaFila[];
   proximas: DrillPayload;
   porRevisar: DrillPayload; // realizadas sin el dato de calificación en Pipedrive
+  sinActualizar: DrillPayload; // reuniones con fecha pasada que siguen en Demo Agendada (cuentan por fecha)
   tendencia: MesFila[];
   porVertical: { nombre: string; realizadas: number; calif: number }[];
   agenda: AgendaItem[];
@@ -285,6 +293,11 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     },
     agendadas: { valor: agendadas.length, drill: reunionesDrill("Reuniones agendadas", agendadas) },
     realizadas: { valor: realizadas.length, drill: reunionesDrill("Reuniones realizadas", realizadas) },
+    sinActualizar: reunionesDrill(
+      "Reuniones que ya pasaron y siguen en Demo Agendada",
+      seg.filter((r) => r.realizada_por === "fecha"),
+      "Cuentan como realizadas por fecha. Muévelas a Demo Realizada (o márcalas perdidas si no ocurrieron)."
+    ),
     noCalif: {
       valor: noCalifRows.length,
       drill: reunionesDrill("Realizadas que NO califican", noCalifRows, `${noCalifRows.length} reunión(es) hechas que no cuentan para comisión`),

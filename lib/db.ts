@@ -39,10 +39,43 @@ export async function fetchReuniones(): Promise<ReunionRow[]> {
   if (reu.error) throw new Error(`v_reuniones: ${reu.error.message}`);
   if (stages.error) throw new Error(`fact_deals: ${stages.error.message}`);
   const stageById = new Map((stages.data ?? []).map((d: any) => [String(d.deal_id), d.max_stage_id as number | null]));
-  return ((reu.data ?? []) as Omit<ReunionRow, "pipeline">[]).map((r) => ({
-    ...r,
-    pipeline: pipelineOf(stageById.get(String(r.deal_id))),
-  }));
+  return ((reu.data ?? []) as Omit<ReunionRow, "pipeline" | "realizada_por">[]).map((r) =>
+    realizadaEfectiva({ ...r, pipeline: pipelineOf(stageById.get(String(r.deal_id))), realizada_por: null })
+  );
+}
+
+// Motivos de pérdida que solo se conocen DESPUÉS de la reunión (la reunión ocurrió):
+//   272 = No calificó — volumen insuficiente · 64 = No calificó — no graban / chats no centralizados.
+// Ojo: 16 (Sin respuesta / Ghosting) NO prueba que la reunión ocurrió → no cuenta.
+const MOTIVOS_POST_REUNION = new Set(["272", "64"]);
+
+/**
+ * "Realizada" EFECTIVA. v_reuniones solo marca realizada si el deal llegó a Demo Realizada, pero en la
+ * operación hay reuniones que sí ocurrieron y no se movieron de etapa:
+ *   - etapa:  llegó a Demo Realizada o más (regla original de la vista).
+ *   - motivo: se perdió desde Demo Agendada con un motivo post-reunión (ej. Valenta).
+ *   - fecha:  sigue ABIERTO en Demo Agendada y la fecha de reunión ya pasó (ej. Coppel) → cuenta,
+ *             pero se marca para que actualicen la etapa en Pipedrive.
+ * Calificada realizada = realizada efectiva Y cumple la regla (es_calificada de la vista).
+ * Misma lógica en sento-motor/scripts/reporte-comisiones.mjs.
+ */
+export function realizadaEfectiva(r: ReunionRow, hoy = hoyIso()): ReunionRow {
+  if (r.es_realizada) return { ...r, realizada_por: "etapa" };
+  if (!r.es_agendada || !r.fecha_reunion) return r;
+  const pasada = String(r.fecha_reunion).slice(0, 10) < hoy;
+  const por: ReunionRow["realizada_por"] =
+    r.etapa === "Perdido" && MOTIVOS_POST_REUNION.has(String(r.motivo_perdida_option_id ?? ""))
+      ? "motivo"
+      : r.etapa !== "Perdido" && r.etapa !== "Ganado" && pasada
+      ? "fecha"
+      : null;
+  if (!por) return r;
+  return { ...r, es_realizada: true, es_calificada_realizada: r.es_calificada, realizada_por: por };
+}
+
+function hoyIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Última vez que el Flujo 5 escribió en fact_deals (frescura de los datos de Pipedrive). */

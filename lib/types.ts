@@ -82,6 +82,10 @@ export type ReunionRow = {
   chats_mes: number | null;
   discovery: string | null;
   pipeline: PipelineName; // DERIVADO: join con fact_deals.max_stage_id por deal_id
+  motivo_perdida_option_id?: string | null;
+  max_stage?: string | null;
+  // Por qué cuenta como realizada (ver realizadaEfectiva en lib/db.ts): etapa | motivo | fecha | null
+  realizada_por: "etapa" | "motivo" | "fecha" | null;
 };
 
 export type MetaRow = {

@@ -102,6 +102,17 @@ function Contenido({ d }: { d: ReunionesData }) {
         </Card>
       </section>
 
+      {d.sinActualizar.rows.length > 0 && (
+        <Callout
+          tone="warn"
+          title={`${d.sinActualizar.rows.length} reunión(es) ya pasaron pero siguen en “Demo Agendada” en Pipedrive`}
+          action={<DrillButton drill={d.sinActualizar} label="Ver cuáles" />}
+        >
+          Las contamos como realizadas por su fecha. Muévelas a Demo Realizada (o márcalas perdidas si no ocurrieron) y
+          captura “Graban llamadas” para que puedan calificar.
+        </Callout>
+      )}
+
       {/* ───────── Realizadas que NO califican (aparte) ───────── */}
       <Card
         title={`Realizadas que no califican · ${d.noCalif.valor}`}
