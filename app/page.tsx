@@ -92,9 +92,10 @@ function Vista({ r, ve, ins, puente }: VistaProps) {
               <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">Calificadas realizadas</span>
             </div>
             <div className="w-full space-y-3">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Mini label="Agendadas" value={r.agendadas.valor} drill={r.agendadas.drill} color="#3FA9FF" />
                 <Mini label="Realizadas" value={r.realizadas.valor} drill={r.realizadas.drill} color="#29B6C9" />
+                <Mini label="No califican" value={r.noCalif.valor} drill={r.noCalif.drill} color="#94A3B8" />
                 <Mini label="Próximas" value={r.agenda.length} drill={r.proximas} color="#7C5CFF" />
               </div>
               <BulletRows

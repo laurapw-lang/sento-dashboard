@@ -9,22 +9,25 @@
 // ================================================================
 
 // --- VENTA: AEs por owner_id (user_id.id de Pipedrive, ESTABLE) ---
+// 2026-10-12: Edgardo Velasquez (25734203) sale del equipo (sus 10 deals como AE estaban perdidos).
 export const AES_VENTA: { ownerId: number; nombre: string }[] = [
   { ownerId: 24943809, nombre: "Andrés Sanjuán" },
-  { ownerId: 25734203, nombre: "Edgardo Velasquez" },
   { ownerId: 25734214, nombre: "Michelle Sosa" },
 ];
 
 // --- REUNIONES: equipo por agendado_por_option_id (option_id ESTABLE) ---
 // metaEntidad = cómo se llama esta persona en la tabla `metas` (para unir meta vs real).
 // null = no tiene meta de reuniones (ej. Andrés no está en el seed de metas).
+// 2026-10-12: salen Zalesmachine (275) y Edgardo Velasquez (278). Sus reuniones y sus metas dejan de
+// contar en todo el dashboard (también en meses pasados), para que el equipo se compare contra sí mismo.
 export const REUNIONES_TEAM: { optionId: string; nombre: string; metaEntidad: string | null }[] = [
   { optionId: "249", nombre: "Andrés Sanjuán", metaEntidad: null },
   { optionId: "274", nombre: "Laura Peña", metaEntidad: "Laura" },
-  { optionId: "275", nombre: "Zalesmachine", metaEntidad: "Zalesmachine" },
-  { optionId: "278", nombre: "Edgardo Velasquez", metaEntidad: "Edgardo" },
   { optionId: "279", nombre: "Michelle Sosa", metaEntidad: "Michelle" },
 ];
+
+/** Entidades de `metas` del equipo actual: solo estas suman a la meta del equipo. */
+export const META_ENTIDADES_EQUIPO = new Set(REUNIONES_TEAM.map((r) => r.metaEntidad).filter(Boolean) as string[]);
 
 // --- Índices para lookup O(1) (derivados de las listas de arriba) ---
 const AE_OWNER_IDS = new Set(AES_VENTA.map((a) => a.ownerId));
@@ -59,8 +62,6 @@ export function reunionesLabel(optionId: string | null | undefined, fallback?: s
 const ORIGEN_ID_BY_NAME: Record<string, string> = {
   "Andrés Sanjuán": "249",
   "Laura Peña": "274",
-  "Zalesmachine": "275",
-  "Edgardo Velasquez": "278",
   "Michelle Sosa": "279",
   "Otro": "260",
 };

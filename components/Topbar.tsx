@@ -6,7 +6,7 @@
 
 import { usePathname } from "next/navigation";
 import { useFilters, periodoLabel, type Periodo } from "@/lib/filters";
-import { ORIGEN_OPTIONS } from "@/lib/team";
+import { ORIGEN_OPTIONS, AES_VENTA } from "@/lib/team";
 import { PIPELINES } from "@/lib/pipeline";
 import { useAsync } from "@/lib/useAsync";
 import { fetchUltimaSync } from "@/lib/db";
@@ -22,7 +22,7 @@ const PERIODO_OPTS: { value: Periodo["preset"]; label: string }[] = [
 
 const SIMPLE: { key: "vertical" | "ae" | "carril" | "origen" | "canal"; label: string; options: string[] }[] = [
   { key: "origen", label: "Quién agendó", options: ORIGEN_OPTIONS }, // setter — Reuniones/Venta
-  { key: "ae", label: "AE", options: ["Todos", "Andrés Sanjuán", "Edgardo Velasquez", "Michelle Sosa"] },
+  { key: "ae", label: "AE", options: ["Todos", ...AES_VENTA.map((a) => a.nombre)] },
   { key: "vertical", label: "Vertical", options: ["Todas", "Banca/Fintech", "Retail", "Salud", "Seguros", "BPO", "Sin definir"] },
   { key: "carril", label: "Carril", options: ["Todos", "Mid-market", "Enterprise"] },
   { key: "canal", label: "Canal", options: ["Todos", "LinkedIn", "Email"] }, // Prospección

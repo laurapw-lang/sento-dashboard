@@ -9,7 +9,7 @@
 
 import type { DrillPayload, ReunionRow, MetaRow } from "./types";
 import { fetchReuniones, fetchMetas } from "./db";
-import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM, matchOrigen, metaEntidadForOrigen } from "./team";
+import { isReunionesTeam, reunionesLabel, REUNIONES_TEAM, META_ENTIDADES_EQUIPO, matchOrigen, metaEntidadForOrigen } from "./team";
 import { inPeriodo, matchVertical, matchCarril, matchAE, matchPipeline, periodoLabel, type Filters } from "./filters";
 import { PIPELINES, type PipelineName } from "./pipeline";
 import type { AgendaItem } from "@/components/viz";
@@ -57,11 +57,13 @@ export type PersonaFila = {
   agendadas: number;
   realizadas: number;
   calif: number;
+  noCalif: number; // realizadas que NO califican (se miden aparte)
   meta: number | null;
   drill: DrillPayload;
 };
 export type PipelineFila = { nombre: PipelineName; color: string; agendadas: number; realizadas: number; calif: number; drill: DrillPayload };
-export type MesFila = { mes: string; key: string; Analytics: number; "Voice Agent": number; meta: number | null };
+export type MesFila = { mes: string; key: string; Analytics: number; "Voice Agent": number; "No califican": number; meta: number | null };
+export type RazonNoCalif = { razon: string; n: number; recuperable: boolean; drill: DrillPayload };
 
 export type ReunionesData = {
   periodo: string;
@@ -70,6 +72,8 @@ export type ReunionesData = {
   calif: Bloque & { meta: number | null; metaAgendadas: number | null };
   agendadas: Bloque;
   realizadas: Bloque;
+  // Realizadas que NO califican: no cuentan para comisión pero SÍ son reuniones hechas → se miden aparte.
+  noCalif: Bloque & { razones: RazonNoCalif[] };
   showRate: number | null; // realizadas / agendadas
   tasaCalif: number | null; // calificadas realizadas / realizadas
   porPipeline: PipelineFila[];
@@ -97,11 +101,33 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
   const agendadas = seg.filter((r) => r.es_agendada && inPeriodo(r.fecha_agendado, filters.periodo));
   const realizadas = seg.filter((r) => r.es_realizada && inPeriodo(r.fecha_reunion, filters.periodo));
   const califReal = realizadas.filter((r) => r.es_calificada_realizada === true);
+  const noCalifRows = realizadas.filter((r) => r.es_calificada_realizada !== true);
+  // Por qué no califica (en el orden de la regla de v_reuniones).
+  const razonDe = (r: ReunionRow): { razon: string; recuperable: boolean } =>
+    r.graban_llamadas == null
+      ? { razon: "Falta capturar “Graban llamadas”", recuperable: true }
+      : r.graban_llamadas === false
+      ? { razon: "No graban llamadas", recuperable: false }
+      : r.es_calificada_realizada == null
+      ? { razon: "Falta el motivo de pérdida", recuperable: true }
+      : { razon: "Perdido por volumen insuficiente (<150 h/mes)", recuperable: false };
+  const razonesMap = new Map<string, { recuperable: boolean; rows: ReunionRow[] }>();
+  for (const r of noCalifRows) {
+    const { razon, recuperable } = razonDe(r);
+    const cur = razonesMap.get(razon) ?? { recuperable, rows: [] };
+    cur.rows.push(r);
+    razonesMap.set(razon, cur);
+  }
+  const razones: RazonNoCalif[] = Array.from(razonesMap.entries())
+    .map(([razon, v]) => ({ razon, n: v.rows.length, recuperable: v.recuperable, drill: reunionesDrill(`No califican: ${razon}`, v.rows) }))
+    .sort((a, b) => b.n - a.n);
 
   // ---- Metas (de setter, mensuales): siguen Periodo + Quién agendó. No se dividen por pipeline.
   const metaAplica = filters.pipeline === "Todos";
   const origenTodos = !filters.origen || filters.origen === "Todos";
   const metaEntidadSel = origenTodos ? null : metaEntidadForOrigen(filters.origen);
+  // Solo metas de personas del equipo ACTUAL (las de quienes ya salieron no suman).
+  metas = metas.filter((m) => m.tipo_meta === "mrr" || m.tipo_meta === "logos" || META_ENTIDADES_EQUIPO.has(m.entidad ?? ""));
   const metasDe = (tipo: string) => {
     const base = metas.filter((m) => m.tipo_meta === tipo).filter((m) => inPeriodo(m.periodo, filters.periodo));
     return origenTodos ? base : metaEntidadSel ? base.filter((m) => m.entidad === metaEntidadSel) : [];
@@ -137,6 +163,7 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
         agendadas: mine(agendadas).length,
         realizadas: mine(realizadas).length,
         calif: mine(califReal).length,
+        noCalif: mine(noCalifRows).length,
         meta: metaAplica && meta > 0 ? meta : null,
         drill: reunionesDrill(`${m.nombre} — calificadas realizadas`, mine(califReal)),
       };
@@ -214,6 +241,9 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
       key,
       Analytics: delMes.filter((r) => r.pipeline === "Analytics").length,
       "Voice Agent": delMes.filter((r) => r.pipeline === "Voice Agent").length,
+      "No califican": seg.filter(
+        (r) => r.es_realizada && r.es_calificada_realizada !== true && String(r.fecha_reunion ?? "").startsWith(key)
+      ).length,
       meta: metaAplica && meta > 0 ? meta : null,
     };
   });
@@ -255,6 +285,11 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     },
     agendadas: { valor: agendadas.length, drill: reunionesDrill("Reuniones agendadas", agendadas) },
     realizadas: { valor: realizadas.length, drill: reunionesDrill("Reuniones realizadas", realizadas) },
+    noCalif: {
+      valor: noCalifRows.length,
+      drill: reunionesDrill("Realizadas que NO califican", noCalifRows, `${noCalifRows.length} reunión(es) hechas que no cuentan para comisión`),
+      razones,
+    },
     showRate: agendadas.length ? realizadas.length / agendadas.length : null,
     tasaCalif: realizadas.length ? califReal.length / realizadas.length : null,
     porPipeline,

@@ -85,6 +85,16 @@ function Contenido({ d }: { d: ReunionesData }) {
               { label: "Calificadas", value: d.calif.valor, color: "#1D9E75", drill: d.calif.drill, hint: "Lo que se paga" },
             ]}
           />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => open(d.calif.drill)} className="rounded-xl bg-semaforo-green/10 px-3 py-2 text-left hover:ring-1 hover:ring-semaforo-green">
+              <div className="text-xl font-bold tabular-nums text-[#158060]">{d.calif.valor}</div>
+              <div className="text-[11px] text-ink-muted">realizadas que <strong>sí califican</strong> (se pagan)</div>
+            </button>
+            <button type="button" onClick={() => open(d.noCalif.drill)} className="rounded-xl bg-slate-100 px-3 py-2 text-left hover:ring-1 hover:ring-slate-300">
+              <div className="text-xl font-bold tabular-nums text-ink">{d.noCalif.valor}</div>
+              <div className="text-[11px] text-ink-muted">realizadas que <strong>no califican</strong> (se miden aparte)</div>
+            </button>
+          </div>
           <p className="mt-3 text-[11px] text-ink-muted">
             Agendadas cuentan por fecha de agendado y realizadas por fecha de reunión: la conversión es del periodo, no de las mismas cuentas.
             {d.calif.metaAgendadas ? ` Meta de agendadas: ${d.calif.metaAgendadas}.` : ""}
@@ -92,15 +102,51 @@ function Contenido({ d }: { d: ReunionesData }) {
         </Card>
       </section>
 
-      {d.porRevisar.rows.length > 0 && (
-        <Callout
-          tone="warn"
-          title={`${d.porRevisar.rows.length} reunión(es) realizada(s) no cuentan todavía: falta un dato en Pipedrive`}
-          action={<DrillButton drill={d.porRevisar} label="Ver cuáles" />}
-        >
-          Captura “Graban llamadas” (o el motivo de pérdida) y se actualiza en la siguiente sincronización (cada hora).
-        </Callout>
-      )}
+      {/* ───────── Realizadas que NO califican (aparte) ───────── */}
+      <Card
+        title={`Realizadas que no califican · ${d.noCalif.valor}`}
+        subtitle="Reuniones que sí se hicieron pero no cuentan para comisión. Se miden aparte para no perderlas de vista: las marcadas como “recuperable” pueden contar si se captura el dato en Pipedrive."
+        action={d.noCalif.valor > 0 ? <DrillButton drill={d.noCalif.drill} label="Ver todas" /> : undefined}
+      >
+        {d.noCalif.valor === 0 ? (
+          <p className="text-sm text-ink-muted">Todas las reuniones realizadas del periodo califican 🎉</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr]">
+            <div className="flex flex-col justify-center rounded-xl bg-canvas p-4 text-center">
+              <div className="text-4xl font-bold tabular-nums text-ink">{d.noCalif.valor}</div>
+              <div className="text-[12px] text-ink-muted">
+                de {d.realizadas.valor} realizadas ({d.realizadas.valor ? Math.round((d.noCalif.valor / d.realizadas.valor) * 100) : 0}%)
+              </div>
+              {d.noCalif.razones.some((r) => r.recuperable) && (
+                <div className="mt-2 rounded-lg bg-semaforo-amber/15 px-2 py-1 text-[11px] font-semibold text-[#B9770F]">
+                  {d.noCalif.razones.filter((r) => r.recuperable).reduce((s, r) => s + r.n, 0)} recuperables
+                </div>
+              )}
+            </div>
+            <div className="space-y-2.5">
+              {d.noCalif.razones.map((r) => (
+                <button key={r.razon} type="button" onClick={() => open(r.drill)} className="block w-full text-left">
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[13px]">
+                    <span className="flex items-center gap-2 text-ink">
+                      {r.razon}
+                      {r.recuperable && (
+                        <span className="rounded-full bg-semaforo-amber/15 px-2 py-0.5 text-[10px] font-bold text-[#B9770F]">recuperable</span>
+                      )}
+                    </span>
+                    <span className="font-bold tabular-nums text-ink">{r.n}</span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-line/60">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${(r.n / d.noCalif.valor) * 100}%`, background: r.recuperable ? "#EF9F27" : "#94A3B8" }}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* ───────── 2 · Equipo + mezclas ───────── */}
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -110,7 +156,7 @@ function Contenido({ d }: { d: ReunionesData }) {
               label: p.nombre,
               value: p.calif,
               meta: p.meta,
-              secundario: `${p.realizadas} real. · ${p.agendadas} ag.`,
+              secundario: `${p.realizadas} real. · ${p.noCalif} no calif. · ${p.agendadas} ag.`,
               drill: p.drill,
               activo: filters.origen === p.nombre,
               onPick: () => toggle("origen", p.nombre, "Todos"),
@@ -174,7 +220,7 @@ function Contenido({ d }: { d: ReunionesData }) {
       </Card>
 
       {/* ───────── 4 · Tendencia ───────── */}
-      <Card title="Últimos 6 meses" subtitle="Calificadas realizadas por mes y pipeline vs meta. Clic en un mes para ver ese mes en todo el dashboard.">
+      <Card title="Últimos 6 meses" subtitle="Calificadas realizadas por mes y pipeline vs meta; en gris, las realizadas que no califican. Clic en un mes para ver ese mes en todo el dashboard.">
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -197,6 +243,7 @@ function Contenido({ d }: { d: ReunionesData }) {
               {PIPELINES.map((p, i) => (
                 <Bar key={p.nombre} dataKey={p.nombre} stackId="c" fill={p.color} maxBarSize={52} radius={i === PIPELINES.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]} />
               ))}
+              <Bar dataKey="No califican" stackId="n" fill="#CBD5E1" maxBarSize={22} radius={[6, 6, 0, 0]} />
               <Line type="monotone" dataKey="meta" name="Meta" stroke="#1A2130" strokeDasharray="5 4" strokeWidth={2} dot={{ r: 3 }} connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
@@ -213,6 +260,7 @@ function Contenido({ d }: { d: ReunionesData }) {
                   {m.meta ? <span className="font-normal text-ink-muted">/{m.meta}</span> : null}
                 </div>
                 {sem && m.meta ? <div className="text-[10px] font-bold" style={{ color: sem.color }}>{Math.round((tot / m.meta) * 100)}%</div> : null}
+                {m["No califican"] > 0 && <div className="text-[10px] text-ink-muted">+{m["No califican"]} no calif.</div>}
               </div>
             );
           })}

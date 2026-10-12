@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 import { pipelineOf } from "@/lib/pipeline";
+import { REUNIONES_TEAM, AES_VENTA } from "@/lib/team";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,9 +26,9 @@ const system = () => `Eres el analista de datos del dashboard de prospección y 
 
 Conoces las métricas del negocio:
 - REUNIONES: la métrica principal (de comisiones) es "reuniones calificadas REALIZADAS" (es_calificada_realizada = la reunión ocurrió —Demo Realizada o más— Y cumple la regla: graban llamadas = sí y no perdida por volumen insuficiente), contada por fecha_reunion. es_agendada = llegó a Demo Agendada o más (se cuenta por fecha_agendado). es_calificada_realizada = null significa que falta un dato en Pipedrive (no es descarte).
-- PIPELINES: hay DOS pipelines de venta en Pipedrive: "Analytics" y "Voice Agent". Cada reunión y deal trae el campo pipeline. Cuando des cifras, especifica de qué pipeline son (o que son ambos). El equipo de reuniones se identifica por agendado_por_option_id: 249=Andrés Sanjuán, 274=Laura Peña, 275=Zalesmachine, 278=Edgardo Velasquez, 279=Michelle Sosa. Las metas mensuales están en metas_reuniones (por entidad y periodo; son totales, no por pipeline). Hoy es ${new Date().toISOString().slice(0, 10)}.
+- PIPELINES: hay DOS pipelines de venta en Pipedrive: "Analytics" y "Voice Agent". Cada reunión y deal trae el campo pipeline. Cuando des cifras, especifica de qué pipeline son (o que son ambos). El equipo de reuniones se identifica por agendado_por_option_id: 249=Andrés Sanjuán, 274=Laura Peña, 279=Michelle Sosa (Zalesmachine y Edgardo ya NO son del equipo: ignora sus reuniones y metas). Las metas mensuales están en metas_reuniones (por entidad y periodo; son totales, no por pipeline). Hoy es ${new Date().toISOString().slice(0, 10)}.
 - EMBUDO (embudo_journey): recorrido acumulativo por etapa MÁXIMA alcanzada (incluye deals perdidos por hasta dónde llegaron, no como "Perdido"). "alcanzaron" = cuántos deals llegaron a esa etapa o más.
-- PIPELINE: pipeline_objetivo (≈186,000 = MRR anual 37,200 / win_rate supuesto 0.20), pipeline_actual y brecha. pipeline_actual = estado actual por etapa. El equipo AE de venta es Andrés Sanjuán, Edgardo Velasquez, Michelle Sosa.
+- PIPELINE: pipeline_objetivo (≈186,000 = MRR anual 37,200 / win_rate supuesto 0.20), pipeline_actual y brecha. pipeline_actual = estado actual por etapa. El equipo AE de venta es Andrés Sanjuán y Michelle Sosa.
 - MOTIVOS: por qué se pierden los deals (motivos_perdida).
 
 Reglas:
@@ -103,8 +104,8 @@ export async function POST(req: Request) {
     : reuniones;
 
   const contexto = {
-    equipo_reuniones_option_id: { "249": "Andrés Sanjuán", "274": "Laura Peña", "275": "Zalesmachine", "278": "Edgardo Velasquez", "279": "Michelle Sosa" },
-    equipo_ae_owner_id: { "24943809": "Andrés Sanjuán", "25734203": "Edgardo Velasquez", "25734214": "Michelle Sosa" },
+    equipo_reuniones_option_id: Object.fromEntries(REUNIONES_TEAM.map((r) => [r.optionId, r.nombre])),
+    equipo_ae_owner_id: Object.fromEntries(AES_VENTA.map((a) => [String(a.ownerId), a.nombre])),
     embudo_journey: embudo,
     pipeline_actual: pipelineActual,
     pipeline_objetivo: pipelineObjetivo,
