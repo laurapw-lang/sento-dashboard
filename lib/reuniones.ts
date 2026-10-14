@@ -53,6 +53,8 @@ function reunionesDrill(title: string, rows: ReunionRow[], subtitle?: string): D
             ? "⚠ ya pasó la reunión: mover a Demo Realizada"
             : r.realizada_por === "motivo"
             ? "perdida después de la reunión"
+            : r.por_confirmar
+            ? "⚠ ¿no-show? sin “Graban llamadas”: no cuenta como realizada"
             : "",
       })),
   };
@@ -295,8 +297,8 @@ export function buildReuniones(reuniones: ReunionRow[], metas: MetaRow[], filter
     realizadas: { valor: realizadas.length, drill: reunionesDrill("Reuniones realizadas", realizadas) },
     sinActualizar: reunionesDrill(
       "Reuniones que ya pasaron y siguen en Demo Agendada",
-      seg.filter((r) => r.realizada_por === "fecha"),
-      "Cuentan como realizadas por fecha. Muévelas a Demo Realizada (o márcalas perdidas si no ocurrieron)."
+      seg.filter((r) => r.realizada_por === "fecha" || r.por_confirmar),
+      "Con “Graban llamadas” cuentan como realizadas por fecha: muévelas a Demo Realizada. Sin ese dato NO cuentan (¿no-show?): captúralo si ocurrió, actualiza la fecha si se reprogramó o márcalas perdidas."
     ),
     noCalif: {
       valor: noCalifRows.length,

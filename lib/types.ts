@@ -86,6 +86,8 @@ export type ReunionRow = {
   max_stage?: string | null;
   // Por qué cuenta como realizada (ver realizadaEfectiva en lib/db.ts): etapa | motivo | fecha | null
   realizada_por: "etapa" | "motivo" | "fecha" | null;
+  // Ya pasó la fecha, sigue en Demo Agendada y sin "Graban llamadas": ¿no-show? NO cuenta como realizada.
+  por_confirmar?: boolean;
 };
 
 export type MetaRow = {

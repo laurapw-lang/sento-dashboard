@@ -54,8 +54,10 @@ const MOTIVOS_POST_REUNION = new Set(["272", "64"]);
  * operación hay reuniones que sí ocurrieron y no se movieron de etapa:
  *   - etapa:  llegó a Demo Realizada o más (regla original de la vista).
  *   - motivo: se perdió desde Demo Agendada con un motivo post-reunión (ej. Valenta).
- *   - fecha:  sigue ABIERTO en Demo Agendada y la fecha de reunión ya pasó (ej. Coppel) → cuenta,
- *             pero se marca para que actualicen la etapa en Pipedrive.
+ *   - fecha:  sigue ABIERTO en Demo Agendada, la fecha de reunión ya pasó Y "Graban llamadas" está
+ *             capturado (ej. Coppel) → cuenta, pero se marca para que actualicen la etapa en Pipedrive.
+ *             Sin "Graban llamadas" no hay prueba de que ocurrió (puede ser NO-SHOW, ej. Midoconline
+ *             oct-2026) → NO cuenta y queda por_confirmar.
  * Calificada realizada = realizada efectiva Y cumple la regla (es_calificada de la vista).
  * Misma lógica en sento-motor/scripts/reporte-comisiones.mjs.
  */
@@ -63,13 +65,14 @@ export function realizadaEfectiva(r: ReunionRow, hoy = hoyIso()): ReunionRow {
   if (r.es_realizada) return { ...r, realizada_por: "etapa" };
   if (!r.es_agendada || !r.fecha_reunion) return r;
   const pasada = String(r.fecha_reunion).slice(0, 10) < hoy;
+  const abiertaPasada = r.etapa !== "Perdido" && r.etapa !== "Ganado" && pasada;
   const por: ReunionRow["realizada_por"] =
     r.etapa === "Perdido" && MOTIVOS_POST_REUNION.has(String(r.motivo_perdida_option_id ?? ""))
       ? "motivo"
-      : r.etapa !== "Perdido" && r.etapa !== "Ganado" && pasada
+      : abiertaPasada && r.graban_llamadas != null
       ? "fecha"
       : null;
-  if (!por) return r;
+  if (!por) return abiertaPasada ? { ...r, por_confirmar: true } : r;
   return { ...r, es_realizada: true, es_calificada_realizada: r.es_calificada, realizada_por: por };
 }
 
